@@ -1,3 +1,4 @@
+// src/config/config.js
 const config = require('./index');
 
 module.exports = {
@@ -7,34 +8,22 @@ module.exports = {
     database: config.database.name,
     host: config.database.host,
     port: config.database.port,
-    dialect: 'postgres', // Make sure this is a string
-    timezone: config.database.timezone,
-    logging: false
+    dialect: config.database.dialect, // This should be a string like "postgres" or "mysql"
+    timezone: config.database.timezone
   },
   test: {
     username: config.database.username,
     password: config.database.password,
-    database: config.database.name + '_test',
+    database: config.database.name,
     host: config.database.host,
-    port: config.database.port,
-    dialect: 'postgres',
-    timezone: config.database.timezone,
-    logging: false
+    dialect: config.database.dialect
   },
   production: {
     username: config.database.username,
     password: config.database.password,
     database: config.database.name,
     host: config.database.host,
-    port: config.database.port,
-    dialect: 'postgres',
-    timezone: config.database.timezone,
-    logging: false,
-    dialectOptions: {
-      ssl: {
-        require: true,
-        rejectUnauthorized: false
-      }
-    }
+    dialect: config.database.dialect,
+    logging: false
   }
 };

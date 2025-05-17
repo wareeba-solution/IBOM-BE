@@ -7,6 +7,7 @@ const auditController = require('../controllers/audit.controller');
 const backupController = require('../controllers/backup.controller');
 const settingController = require('../controllers/setting.controller');
 const notificationController = require('../controllers/notification.controller');
+const userController = require('../controllers/user.controller'); // Add this line
 
 const { authenticate, isAdmin, hasRole } = require('../middlewares/auth.middleware');
 
@@ -44,5 +45,18 @@ router.get('/notifications', notificationController.getUserNotifications);
 router.put('/notifications/:id/read', notificationController.markAsRead);
 router.put('/notifications/read-all', notificationController.markAllAsRead);
 router.put('/notifications/:id/archive', notificationController.archiveNotification);
+
+// User management routes for administrators
+// Add these new routes
+router.patch('/users/:id/activate', isAdmin, userController.activateUser);
+router.patch('/users/:id/deactivate', isAdmin, userController.deactivateUser);
+router.get('/users/pending', isAdmin, (req, res) => {
+  req.query.status = 'pending';
+  userController.getAllUsers(req, res);
+});
+router.get('/users/inactive', isAdmin, (req, res) => {
+  req.query.status = 'inactive';
+  userController.getAllUsers(req, res);
+});
 
 module.exports = router;

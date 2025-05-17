@@ -155,4 +155,23 @@ const helpers = {
   },
 };
 
+/**
+ * Describe a database model to get its columns
+ * This is used to filter incoming data to only include valid columns
+ * @param {Model} model - Sequelize model
+ * @returns {Promise<Object>} Model description
+ */
+const describeModel = async (model) => {
+  try {
+    const result = await model.sequelize.query(
+      `SELECT column_name FROM information_schema.columns WHERE table_name = '${model.tableName}'`
+    );
+    const columns = result[0].map((column) => column.column_name);
+    return columns;
+  } catch (error) {
+    console.error('Error describing model:', error);
+    return [];
+  }
+};
+
 module.exports = helpers;

@@ -60,6 +60,7 @@ router.patch(
   [isAdmin],
   UserController.activateUser
 );
+router.get('/debug-token', UserController.getAllUsers);
 
 // Deactivate user (admin only)
 router.patch(
