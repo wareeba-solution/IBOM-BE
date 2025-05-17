@@ -49,7 +49,8 @@ class BirthController {
       logger.error('Get birth by ID error:', error);
       
       if (error.message === 'Birth record not found') {
-        return ApiResponse.notFound(res, error.message);
+        // Return a friendly message but keep it as a success response
+        return ApiResponse.success(res, 'The requested birth record does not exist or may have been deleted', null);
       }
       
       return ApiResponse.serverError(res, error.message);
@@ -157,14 +158,25 @@ class BirthController {
         page: parseInt(req.query.page, 10) || 1,
         limit: parseInt(req.query.limit, 10) || 10,
       };
-
+  
       const result = await BirthService.searchBirths(searchParams);
+      
+      // If no results were found, provide a friendly message
+      if (result.totalItems === 0) {
+        return ApiResponse.success(
+          res, 
+          'No birth records match your search criteria. Try adjusting your filters or creating new records.',
+          result
+        );
+      }
+      
       return ApiResponse.success(res, 'Search results retrieved successfully', result);
     } catch (error) {
       logger.error('Search births error:', error);
       return ApiResponse.serverError(res, error.message);
     }
   }
+  
 
   /**
    * Get birth statistics

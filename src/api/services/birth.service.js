@@ -31,7 +31,7 @@ class BirthService {
       } = options;
       
       const offset = (page - 1) * limit;
-
+  
       // Build where clause
       const where = {};
       
@@ -57,7 +57,7 @@ class BirthService {
       if (lgaResidence) {
         where.motherLgaResidence = lgaResidence;
       }
-
+  
       // Find birth records
       const { rows: births, count } = await Birth.findAndCountAll({
         where,
@@ -74,22 +74,13 @@ class BirthService {
             model: Facility,
             as: 'facility',
           },
-          {
-            model: User,
-            as: 'registeredBy',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
-          {
-            model: User,
-            as: 'attendedBy',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
+          // User associations are removed temporarily
         ],
         limit,
         offset,
         order: [['birthDate', 'DESC'], ['birthTime', 'DESC']],
       });
-
+  
       return {
         births,
         totalItems: count,
@@ -108,6 +99,7 @@ class BirthService {
    */
   static async getBirthById(id) {
     try {
+      // Fetch the birth record without including the User associations
       const birth = await Birth.findByPk(id, {
         include: [
           {
@@ -126,23 +118,14 @@ class BirthService {
             model: Facility,
             as: 'facility',
           },
-          {
-            model: User,
-            as: 'registeredBy',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
-          {
-            model: User,
-            as: 'attendedBy',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
+          // User associations are removed temporarily
         ],
       });
-
+  
       if (!birth) {
         throw new Error('Birth record not found');
       }
-
+  
       return birth;
     } catch (error) {
       throw error;
@@ -170,28 +153,57 @@ class BirthService {
       if (!facility) {
         throw new Error('Facility not found');
       }
-
+  
       // Start a transaction
       const transaction = await db.sequelize.transaction();
-
+      let transactionCommitted = false;
+  
       try {
+        // Format dates consistently
+        let formattedBirthData = { ...birthData };
+        
+        // Ensure we have a valid birthDate in YYYY-MM-DD format
+        if (formattedBirthData.birthDate) {
+          // If it's not already in YYYY-MM-DD format, attempt to convert it
+          if (!/^\d{4}-\d{2}-\d{2}$/.test(formattedBirthData.birthDate)) {
+            try {
+              const date = new Date(formattedBirthData.birthDate);
+              if (!isNaN(date.getTime())) {
+                formattedBirthData.birthDate = date.toISOString().split('T')[0];
+              }
+            } catch (err) {
+              // If conversion fails, leave as is and let database handle validation
+            }
+          }
+        }
+        
         // Create birth record
         const birth = await Birth.create({
-          ...birthData,
+          ...formattedBirthData,
           createdBy: userId,
         }, { transaction });
-
+  
         // If a visit ID is not provided, create a new visit record
-        let visitId = birthData.visitId;
+        let visitId = formattedBirthData.visitId;
         
         if (!visitId) {
+          // FIXED: Use separate date and time instead of trying to combine them
           const visit = await Visit.create({
-            patientId: birthData.motherId,
-            visitDate: new Date(`${birthData.birthDate}T${birthData.birthTime}`),
+            patientId: formattedBirthData.motherId,
+            visitDate: formattedBirthData.birthDate, // Use birthDate directly
+            visitTime: formattedBirthData.birthTime, // Use birthTime directly
             visitType: 'birth',
             notes: 'Automatically created for birth record',
-            facilityId: birthData.facilityId,
-            attendedBy: birthData.attendedBy || userId,
+            facilityId: formattedBirthData.facilityId,
+            attendedBy: formattedBirthData.attendedBy || userId,
+            // Add default values for columns that were added later
+            followUpNeeded: false,
+            referral: false,
+            chiefComplaint: 'Birth delivery',
+            prescriptions: null,
+            labResults: null,
+            referralFacility: null,
+            referralReason: null
           }, { transaction });
           
           visitId = visit.id;
@@ -199,24 +211,27 @@ class BirthService {
           // Update birth record with visit ID
           await birth.update({ visitId }, { transaction });
         }
-
+  
         // If a baby record is not provided, create a new patient record for the baby
-        let babyId = birthData.babyId;
+        let babyId = formattedBirthData.babyId;
         
         if (!babyId) {
           // Generate baby name if not provided
-          const babyName = `Baby of ${mother.firstName} ${mother.lastName}`;
+          const babyName = formattedBirthData.babyName || `Baby of ${mother.firstName} ${mother.lastName}`;
           
           const baby = await Patient.create({
             uniqueIdentifier: `${mother.uniqueIdentifier}-B${new Date().getTime()}`,
             firstName: babyName,
             lastName: mother.lastName,
-            dateOfBirth: birthData.birthDate,
-            gender: birthData.gender,
+            dateOfBirth: formattedBirthData.birthDate,
+            gender: formattedBirthData.gender,
             lgaOrigin: mother.lgaOrigin,
             lgaResidence: mother.lgaResidence,
-            facilityId: birthData.facilityId,
+            facilityId: formattedBirthData.facilityId,
             createdBy: userId,
+            // Additional required fields for Patient
+            registrationDate: new Date().toISOString().split('T')[0],
+            status: 'active'
           }, { transaction });
           
           babyId = baby.id;
@@ -224,17 +239,30 @@ class BirthService {
           // Update birth record with baby ID
           await birth.update({ babyId }, { transaction });
         }
-
+  
+        // Generate registration number if not provided
+        if (!formattedBirthData.registrationNumber) {
+          const registrationNumber = `BR${Math.floor(10000 + Math.random() * 90000)}`;
+          await birth.update({ registrationNumber }, { transaction });
+        }
+  
         // Commit transaction
         await transaction.commit();
-
+        transactionCommitted = true;
+  
         // Get created birth record with associations
         const createdBirth = await this.getBirthById(birth.id);
-
+  
         return createdBirth;
       } catch (error) {
-        // Rollback transaction
-        await transaction.rollback();
+        // Only rollback the transaction if it hasn't been committed yet
+        if (!transactionCommitted) {
+          try {
+            await transaction.rollback();
+          } catch (rollbackError) {
+            console.error('Error rolling back transaction:', rollbackError);
+          }
+        }
         throw error;
       }
     } catch (error) {
@@ -257,8 +285,26 @@ class BirthService {
         throw new Error('Birth record not found');
       }
 
+      // Format dates consistently
+      let formattedBirthData = { ...birthData };
+      
+      // Ensure we have a valid birthDate in YYYY-MM-DD format
+      if (formattedBirthData.birthDate) {
+        // If it's not already in YYYY-MM-DD format, attempt to convert it
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(formattedBirthData.birthDate)) {
+          try {
+            const date = new Date(formattedBirthData.birthDate);
+            if (!isNaN(date.getTime())) {
+              formattedBirthData.birthDate = date.toISOString().split('T')[0];
+            }
+          } catch (err) {
+            // If conversion fails, leave as is and let database handle validation
+          }
+        }
+      }
+
       // Update birth record
-      await birth.update(birthData);
+      await birth.update(formattedBirthData);
 
       // Get updated birth record with associations
       const updatedBirth = await this.getBirthById(id);
