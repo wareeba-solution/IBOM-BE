@@ -15,8 +15,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
       validate: {
         // Still validate the values in the application layer
-        isIn: [['general', 'antenatal', 'immunization', 'family_planning',
-          'birth', 'death', 'communicable_disease', 'follow_up']]
+        isIn: {
+          args: [['general', 'antenatal', 'immunization', 'family_planning',
+            'birth', 'death', 'communicable_disease', 'follow_up']],
+          msg: 'Invalid visit type'
+        }
       }
     },
     chiefComplaint: {
@@ -40,11 +43,48 @@ module.exports = (sequelize, DataTypes) => {
       defaultValue: false,
     },
     followUpDate: {
-      type: DataTypes.DATEONLY,
+      type: DataTypes.DATEONLY, // Using DATEONLY instead of DATE for follow-up
       allowNull: true,
     },
+    // Added additional fields
+    vitalSigns: {
+      type: DataTypes.JSONB, // For storing BP, temperature, pulse, etc.
+      allowNull: true,
+    },
+    prescriptions: {
+      type: DataTypes.JSONB, // For storing medications
+      allowNull: true,
+    },
+    labResults: {
+      type: DataTypes.JSONB, // For storing lab test results
+      allowNull: true,
+    },
+    referral: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false,
+    },
+    referralFacility: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    referralReason: {
+      type: DataTypes.TEXT,
+      allowNull: true,
+    },
+    status: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      defaultValue: 'active',
+      validate: {
+        isIn: {
+          args: [['active', 'completed', 'cancelled', 'no-show']],
+          msg: 'Invalid visit status'
+        }
+      }
+    }
   }, {
     timestamps: true,
+    paranoid: true, // Added soft delete capability
   });
 
   Visit.associate = (models) => {

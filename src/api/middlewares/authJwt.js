@@ -13,13 +13,16 @@ const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.log('No token provided or incorrect format:', authHeader);
     return ApiResponse.unauthorized(res, 'No token provided');
   }
   
   const token = authHeader.split(' ')[1];
   
   try {
+    console.log('Verifying token...');
     const decoded = jwt.verify(token, config.jwt.secret);
+    console.log('Token decoded successfully:', decoded);
     
     // Find user with the decoded ID
     const user = await User.findByPk(decoded.id, {
@@ -32,11 +35,20 @@ const verifyToken = async (req, res, next) => {
     });
     
     if (!user) {
+      console.log('User not found for decoded ID:', decoded.id);
       return ApiResponse.unauthorized(res, 'Invalid token - user not found');
     }
     
+    console.log('User found:', {
+      id: user.id,
+      username: user.username,
+      status: user.status,
+      role: user.role ? user.role.name : null
+    });
+    
     // Check if user is active
     if (user.status !== 'active') {
+      console.log('User account is not active:', user.status);
       return ApiResponse.forbidden(res, 'Account is not active');
     }
     
@@ -44,6 +56,8 @@ const verifyToken = async (req, res, next) => {
     req.user = user;
     next();
   } catch (error) {
+    console.error('Token verification error:', error);
+    
     if (error.name === 'TokenExpiredError') {
       return ApiResponse.unauthorized(res, 'Token expired');
     }
@@ -60,7 +74,13 @@ const isAdmin = (req, res, next) => {
     return ApiResponse.unauthorized(res, 'No user found');
   }
   
-  if (req.user.role.name === 'admin' || req.user.role.name === 'health_commissioner') {
+  // Convert role name to lowercase for case-insensitive comparison
+  const roleName = req.user.role.name.toLowerCase();
+  
+  // Check against common admin role names
+  if (roleName === 'admin' || 
+      roleName === 'administrator' || 
+      roleName === 'health_commissioner') {
     next();
     return;
   }

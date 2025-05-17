@@ -1,20 +1,297 @@
 const { Op } = require('sequelize');
 const db = require('../../models');
 const helpers = require('../../utils/helpers');
+const logger = require('../../utils/logger');
 
 const Patient = db.Patient;
 const Visit = db.Visit;
 const Facility = db.Facility;
 const User = db.User;
 
+const calculateAge = (dateOfBirth) => {
+  if (!dateOfBirth) return null;
+  const birthDate = new Date(dateOfBirth);
+  const today = new Date();
+  let age = today.getFullYear() - birthDate.getFullYear();
+  const m = today.getMonth() - birthDate.getMonth();
+  if (m < 0 || (m === 0 && today.getDate() < birthDate.getDate())) {
+    age--;
+  }
+  return age;
+};
+
+const formatDateWithAge = (dateOfBirth) => {
+  if (!dateOfBirth) return 'Not provided';
+  const age = calculateAge(dateOfBirth);
+  return `${dateOfBirth} (${age}y)`;
+};
+
 /**
- * Patient service
+ * Patient service with improved error handling and database-awareness
  */
 class PatientService {
+  
   /**
-   * Get all patients
+   * Create a new patient with database-aware field filtering
+   * @param {Object} patientData - Patient data
+   * @param {String} userId - Creating user ID
+   * @returns {Object} Created patient
+   */
+  static async createPatient(patientData, userId) {
+    try {
+      // Verify facility exists
+      const facility = await Facility.findByPk(patientData.facilityId);
+      if (!facility) {
+        throw new Error('Facility not found');
+      }
+      
+      // Generate unique identifier
+      const facilityCode = facility.name.substring(0, 3).toUpperCase();
+      const uniqueIdentifier = helpers.generatePatientId(facilityCode);
+      
+      // Filter the patient data to only include fields that exist in the database
+      // We use the actual Sequelize model definition to get the valid fields
+      const validFields = Object.keys(Patient.rawAttributes);
+      
+      const filteredData = {};
+      for (const key in patientData) {
+        if (validFields.includes(key)) {
+          filteredData[key] = patientData[key];
+        }
+      }
+      
+      // Set default date if not provided
+      if (!filteredData.registrationDate) {
+        filteredData.registrationDate = new Date();
+      }
+
+      // Create patient
+      const patient = await Patient.create({
+        ...filteredData,
+        uniqueIdentifier,
+        createdBy: userId
+      });
+
+      // Get patient with facility and user info
+      const createdPatient = await Patient.findByPk(patient.id, {
+        include: [
+          {
+            model: Facility,
+            as: 'registrationFacility',
+          },
+          {
+            model: User,
+            as: 'registeredBy',
+            attributes: ['id', 'firstName', 'lastName', 'username'],
+          },
+        ],
+      });
+
+      return createdPatient;
+    } catch (error) {
+      logger.error('Error creating patient:', error);
+      
+      // Handle validation errors from Sequelize
+      if (error.name === 'SequelizeValidationError') {
+        const validationErrors = {};
+        error.errors.forEach(err => {
+          validationErrors[err.path] = err.message;
+        });
+        
+        const customError = new Error('Validation failed');
+        customError.validationErrors = validationErrors;
+        throw customError;
+      }
+      
+      // Handle database column errors
+      if (error.message.includes('column') && error.message.includes('does not exist')) {
+        const columnMatch = error.message.match(/column "([^"]+)"/);
+        const columnName = columnMatch ? columnMatch[1] : 'unknown';
+        
+        const customError = new Error(`Database error: Column "${columnName}" does not exist`);
+        customError.isColumnError = true;
+        throw customError;
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Get patient by ID
+   * @param {String} id - Patient ID
+   * @returns {Object} Patient
+   */
+  static async getPatientById(id) {
+    try {
+      const patient = await Patient.findByPk(id, {
+        include: [
+          {
+            model: Facility,
+            as: 'registrationFacility',
+          },
+          {
+            model: User,
+            as: 'registeredBy',
+            attributes: ['id', 'firstName', 'lastName', 'username'],
+          },
+          {
+            model: Visit,
+            as: 'visits',
+            limit: 1,
+            order: [['visitDate', 'DESC']],
+            required: false // Use left join to include patients without visits
+          },
+        ],
+      });
+
+      if (!patient) {
+        throw new Error('Patient not found');
+      }
+
+      // Add calculated fields
+      const enhancedPatient = patient.toJSON();
+      enhancedPatient.age = calculateAge(patient.dateOfBirth);
+      enhancedPatient.formattedDOB = formatDate(patient.dateOfBirth);
+      enhancedPatient.formattedRegistrationDate = formatDate(patient.registrationDate);
+      
+      // Add last visit info
+      if (patient.visits && patient.visits.length > 0) {
+        enhancedPatient.lastVisit = formatDate(patient.visits[0].visitDate);
+        enhancedPatient.lastVisitId = patient.visits[0].id;
+      } else {
+        enhancedPatient.lastVisit = 'Never';
+        enhancedPatient.lastVisitId = null;
+      }
+
+      return enhancedPatient;
+    } catch (error) {
+      logger.error('Error getting patient by ID:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get patient by unique identifier
+   * @param {String} uniqueIdentifier - Patient unique identifier
+   * @returns {Object} Patient
+   */
+  static async getPatientByUniqueIdentifier(uniqueIdentifier) {
+    try {
+      const patient = await Patient.findOne({
+        where: { uniqueIdentifier },
+        include: [
+          {
+            model: Facility,
+            as: 'registrationFacility',
+          },
+          {
+            model: User,
+            as: 'registeredBy',
+            attributes: ['id', 'firstName', 'lastName', 'username'],
+          },
+        ],
+      });
+
+      if (!patient) {
+        throw new Error('Patient not found');
+      }
+
+      return patient;
+    } catch (error) {
+      logger.error('Error getting patient by unique identifier:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update patient
+   * @param {String} id - Patient ID
+   * @param {Object} patientData - Patient data
+   * @returns {Object} Updated patient
+   */
+  static async updatePatient(id, patientData) {
+    try {
+      // Find patient
+      const patient = await Patient.findByPk(id);
+      if (!patient) {
+        throw new Error('Patient not found');
+      }
+
+      // Filter the patient data to only include fields that exist in the database
+      const validFields = Object.keys(Patient.rawAttributes);
+      const filteredData = {};
+      
+      for (const key in patientData) {
+        if (validFields.includes(key)) {
+          filteredData[key] = patientData[key];
+        }
+      }
+
+      // Update patient
+      await patient.update(filteredData);
+
+      // Get updated patient with associations
+      const updatedPatient = await Patient.findByPk(id, {
+        include: [
+          {
+            model: Facility,
+            as: 'registrationFacility',
+          },
+          {
+            model: User,
+            as: 'registeredBy',
+            attributes: ['id', 'firstName', 'lastName', 'username'],
+          },
+        ],
+      });
+
+      return updatedPatient;
+    } catch (error) {
+      logger.error('Error updating patient:', error);
+      
+      // Handle validation errors
+      if (error.name === 'SequelizeValidationError') {
+        const validationErrors = {};
+        error.errors.forEach(err => {
+          validationErrors[err.path] = err.message;
+        });
+        
+        const customError = new Error('Validation failed');
+        customError.validationErrors = validationErrors;
+        throw customError;
+      }
+      
+      throw error;
+    }
+  }
+
+  /**
+   * Delete patient
+   * @param {String} id - Patient ID
+   * @returns {Boolean} Success status
+   */
+  static async deletePatient(id) {
+    try {
+      // Find patient
+      const patient = await Patient.findByPk(id);
+      if (!patient) {
+        throw new Error('Patient not found');
+      }
+
+      // Delete patient (soft delete since paranoid is true)
+      await patient.destroy();
+      return true;
+    } catch (error) {
+      logger.error('Error deleting patient:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all patients with pagination, filters, and enhanced data for UI display
    * @param {Object} options - Query options
-   * @returns {Array} List of patients
+   * @returns {Object} Patients with pagination info and UI-ready fields
    */
   static async getAllPatients(options = {}) {
     try {
@@ -25,17 +302,18 @@ class PatientService {
         gender, 
         lgaResidence, 
         ageFrom, 
-        ageTo 
+        ageTo,
+        status
       } = options;
       
       const offset = (page - 1) * limit;
-
-      // Build where clause
       const where = {};
       
+      // Apply filters
       if (facilityId) where.facilityId = facilityId;
       if (gender) where.gender = gender;
       if (lgaResidence) where.lgaResidence = lgaResidence;
+      if (status) where.status = status;
       
       // Age filter based on date of birth
       if (ageFrom || ageTo) {
@@ -70,8 +348,8 @@ class PatientService {
           };
         }
       }
-
-      // Find patients
+  
+      // Find patients without Visit relationship
       const { rows: patients, count } = await Patient.findAndCountAll({
         where,
         include: [
@@ -89,185 +367,47 @@ class PatientService {
         offset,
         order: [['createdAt', 'DESC']],
       });
-
+  
+      // Add calculated fields for UI display
+      const enhancedPatients = patients.map(patient => {
+        // Convert to plain object to avoid Sequelize instance methods/getters
+        const patientData = patient.toJSON ? patient.toJSON() : { ...patient };
+        
+        // Calculate age from date of birth
+        if (patientData.dateOfBirth) {
+          patientData.age = calculateAge(patientData.dateOfBirth);
+          patientData.formattedDOB = formatDateWithAge(patientData.dateOfBirth);
+        }
+        
+        // Format display name
+        patientData.displayName = `${patientData.firstName || ''} ${patientData.lastName || ''}`.trim();
+        
+        // Add placeholder for last visit info since we don't have the Visit model
+        patientData.lastVisitDate = 'Not available';
+        patientData.lastVisitId = null;
+        
+        // Format full address for display
+        const addressParts = [];
+        if (patientData.address) addressParts.push(patientData.address);
+        if (patientData.city) addressParts.push(patientData.city);
+        if (patientData.state) addressParts.push(patientData.state);
+        patientData.fullAddress = addressParts.length > 0 ? addressParts.join(', ') : 'Not provided';
+        
+        // Add status color for UI
+        patientData.statusColor = patientData.status === 'active' ? 'green' : 
+                                 (patientData.status === 'inactive' ? 'gray' : 'red');
+        
+        return patientData;
+      });
+  
       return {
-        patients,
+        patients: enhancedPatients,
         totalItems: count,
         totalPages: Math.ceil(count / limit),
         currentPage: page,
       };
     } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Get patient by ID
-   * @param {String} id - Patient ID
-   * @returns {Object} Patient
-   */
-  static async getPatientById(id) {
-    try {
-      const patient = await Patient.findByPk(id, {
-        include: [
-          {
-            model: Facility,
-            as: 'registrationFacility',
-          },
-          {
-            model: User,
-            as: 'registeredBy',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
-        ],
-      });
-
-      if (!patient) {
-        throw new Error('Patient not found');
-      }
-
-      return patient;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Get patient by unique identifier
-   * @param {String} uniqueIdentifier - Patient unique identifier
-   * @returns {Object} Patient
-   */
-  static async getPatientByUniqueIdentifier(uniqueIdentifier) {
-    try {
-      const patient = await Patient.findOne({
-        where: { uniqueIdentifier },
-        include: [
-          {
-            model: Facility,
-            as: 'registrationFacility',
-          },
-          {
-            model: User,
-            as: 'registeredBy',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
-        ],
-      });
-
-      if (!patient) {
-        throw new Error('Patient not found');
-      }
-
-      return patient;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Create a new patient
-   * @param {Object} patientData - Patient data
-   * @param {String} userId - Creating user ID
-   * @returns {Object} Created patient
-   */
-  static async createPatient(patientData, userId) {
-    try {
-      // Generate unique identifier
-      const facility = await Facility.findByPk(patientData.facilityId);
-      
-      if (!facility) {
-        throw new Error('Facility not found');
-      }
-      
-      const facilityCode = facility.name.substring(0, 3).toUpperCase();
-      const uniqueIdentifier = helpers.generatePatientId(facilityCode);
-
-      // Create patient
-      const patient = await Patient.create({
-        ...patientData,
-        uniqueIdentifier,
-        createdBy: userId,
-      });
-
-      // Get patient with facility and user
-      const createdPatient = await Patient.findByPk(patient.id, {
-        include: [
-          {
-            model: Facility,
-            as: 'registrationFacility',
-          },
-          {
-            model: User,
-            as: 'registeredBy',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
-        ],
-      });
-
-      return createdPatient;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Update patient
-   * @param {String} id - Patient ID
-   * @param {Object} patientData - Patient data
-   * @returns {Object} Updated patient
-   */
-  static async updatePatient(id, patientData) {
-    try {
-      // Find patient
-      const patient = await Patient.findByPk(id);
-
-      if (!patient) {
-        throw new Error('Patient not found');
-      }
-
-      // Update patient
-      await patient.update(patientData);
-
-      // Get updated patient with facility and user
-      const updatedPatient = await Patient.findByPk(id, {
-        include: [
-          {
-            model: Facility,
-            as: 'registrationFacility',
-          },
-          {
-            model: User,
-            as: 'registeredBy',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
-        ],
-      });
-
-      return updatedPatient;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Delete patient
-   * @param {String} id - Patient ID
-   * @returns {Boolean} Success status
-   */
-  static async deletePatient(id) {
-    try {
-      // Find patient
-      const patient = await Patient.findByPk(id);
-
-      if (!patient) {
-        throw new Error('Patient not found');
-      }
-
-      // Delete patient (soft delete)
-      await patient.destroy();
-
-      return true;
-    } catch (error) {
+      logger.error('Error getting all patients:', error);
       throw error;
     }
   }
@@ -275,7 +415,7 @@ class PatientService {
   /**
    * Search patients
    * @param {Object} searchParams - Search parameters
-   * @returns {Array} Search results
+   * @returns {Object} Search results with pagination info
    */
   static async searchPatients(searchParams) {
     try {
@@ -293,10 +433,9 @@ class PatientService {
       } = searchParams;
       
       const offset = (page - 1) * limit;
-      
-      // Build where clause
       const where = {};
       
+      // Build search conditions
       if (uniqueIdentifier) {
         where.uniqueIdentifier = uniqueIdentifier;
       } else if (term) {
@@ -337,205 +476,7 @@ class PatientService {
         currentPage: page,
       };
     } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Create a new visit
-   * @param {Object} visitData - Visit data
-   * @param {String} userId - Creating user ID
-   * @returns {Object} Created visit
-   */
-  static async createVisit(visitData, userId) {
-    try {
-      // Check if patient exists
-      const patient = await Patient.findByPk(visitData.patientId);
-      
-      if (!patient) {
-        throw new Error('Patient not found');
-      }
-      
-      // Check if facility exists
-      const facility = await Facility.findByPk(visitData.facilityId);
-      
-      if (!facility) {
-        throw new Error('Facility not found');
-      }
-      
-      // Create visit
-      const visit = await Visit.create({
-        ...visitData,
-        attendedBy: userId,
-      });
-
-      // Get visit with patient, facility, and user
-      const createdVisit = await Visit.findByPk(visit.id, {
-        include: [
-          {
-            model: Patient,
-            as: 'patient',
-          },
-          {
-            model: Facility,
-            as: 'facility',
-          },
-          {
-            model: User,
-            as: 'caregiver',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
-        ],
-      });
-
-      return createdVisit;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Get patient visits
-   * @param {String} patientId - Patient ID
-   * @param {Object} options - Query options
-   * @returns {Array} List of visits
-   */
-  static async getPatientVisits(patientId, options = {}) {
-    try {
-      const { page = 1, limit = 10, visitType } = options;
-      const offset = (page - 1) * limit;
-
-      // Build where clause
-      const where = { patientId };
-      if (visitType) where.visitType = visitType;
-
-      // Find visits
-      const { rows: visits, count } = await Visit.findAndCountAll({
-        where,
-        include: [
-          {
-            model: Facility,
-            as: 'facility',
-          },
-          {
-            model: User,
-            as: 'caregiver',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
-        ],
-        limit,
-        offset,
-        order: [['visitDate', 'DESC']],
-      });
-
-      return {
-        visits,
-        totalItems: count,
-        totalPages: Math.ceil(count / limit),
-        currentPage: page,
-      };
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Get visit by ID
-   * @param {String} id - Visit ID
-   * @returns {Object} Visit
-   */
-  static async getVisitById(id) {
-    try {
-      const visit = await Visit.findByPk(id, {
-        include: [
-          {
-            model: Patient,
-            as: 'patient',
-          },
-          {
-            model: Facility,
-            as: 'facility',
-          },
-          {
-            model: User,
-            as: 'caregiver',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
-        ],
-      });
-
-      if (!visit) {
-        throw new Error('Visit not found');
-      }
-
-      return visit;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Update visit
-   * @param {String} id - Visit ID
-   * @param {Object} visitData - Visit data
-   * @returns {Object} Updated visit
-   */
-  static async updateVisit(id, visitData) {
-    try {
-      // Find visit
-      const visit = await Visit.findByPk(id);
-
-      if (!visit) {
-        throw new Error('Visit not found');
-      }
-
-      // Update visit
-      await visit.update(visitData);
-
-      // Get updated visit with patient, facility, and user
-      const updatedVisit = await Visit.findByPk(id, {
-        include: [
-          {
-            model: Patient,
-            as: 'patient',
-          },
-          {
-            model: Facility,
-            as: 'facility',
-          },
-          {
-            model: User,
-            as: 'caregiver',
-            attributes: ['id', 'firstName', 'lastName', 'username'],
-          },
-        ],
-      });
-
-      return updatedVisit;
-    } catch (error) {
-      throw error;
-    }
-  }
-
-  /**
-   * Delete visit
-   * @param {String} id - Visit ID
-   * @returns {Boolean} Success status
-   */
-  static async deleteVisit(id) {
-    try {
-      // Find visit
-      const visit = await Visit.findByPk(id);
-
-      if (!visit) {
-        throw new Error('Visit not found');
-      }
-
-      // Delete visit
-      await visit.destroy();
-
-      return true;
-    } catch (error) {
+      logger.error('Error searching patients:', error);
       throw error;
     }
   }

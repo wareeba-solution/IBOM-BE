@@ -3,7 +3,7 @@ const ApiResponse = require('../../utils/apiResponse');
 const logger = require('../../utils/logger');
 
 /**
- * Patient controller
+ * Patient controller with simplified approach and improved error handling
  */
 class PatientController {
   /**
@@ -98,6 +98,14 @@ class PatientController {
         );
       }
       
+      if (error.validationErrors) {
+        return ApiResponse.validationError(res, 'Validation error', error.validationErrors);
+      }
+      
+      if (error.isColumnError) {
+        return ApiResponse.error(res, error.message, {}, 400);
+      }
+      
       return ApiResponse.serverError(res, error.message);
     }
   }
@@ -118,6 +126,10 @@ class PatientController {
       
       if (error.message === 'Patient not found') {
         return ApiResponse.notFound(res, error.message);
+      }
+      
+      if (error.validationErrors) {
+        return ApiResponse.validationError(res, 'Validation error', error.validationErrors);
       }
       
       return ApiResponse.serverError(res, error.message);
@@ -171,130 +183,6 @@ class PatientController {
       return ApiResponse.success(res, 'Search results retrieved successfully', result);
     } catch (error) {
       logger.error('Search patients error:', error);
-      return ApiResponse.serverError(res, error.message);
-    }
-  }
-
-  /**
-   * Create a new visit
-   * @param {Object} req - Request object
-   * @param {Object} res - Response object
-   * @returns {Object} Response
-   */
-  static async createVisit(req, res) {
-    try {
-      const visit = await PatientService.createVisit(req.body, req.user.id);
-      return ApiResponse.created(res, 'Visit created successfully', visit);
-    } catch (error) {
-      logger.error('Create visit error:', error);
-      
-      if (error.message === 'Patient not found') {
-        return ApiResponse.error(
-          res,
-          error.message,
-          { patientId: 'Patient not found' },
-          404
-        );
-      }
-      
-      if (error.message === 'Facility not found') {
-        return ApiResponse.error(
-          res,
-          error.message,
-          { facilityId: 'Facility not found' },
-          404
-        );
-      }
-      
-      return ApiResponse.serverError(res, error.message);
-    }
-  }
-
-  /**
-   * Get patient visits
-   * @param {Object} req - Request object
-   * @param {Object} res - Response object
-   * @returns {Object} Response
-   */
-  static async getPatientVisits(req, res) {
-    try {
-      const { patientId } = req.params;
-      const options = {
-        page: parseInt(req.query.page, 10) || 1,
-        limit: parseInt(req.query.limit, 10) || 10,
-        visitType: req.query.visitType,
-      };
-
-      const result = await PatientService.getPatientVisits(patientId, options);
-      return ApiResponse.success(res, 'Patient visits retrieved successfully', result);
-    } catch (error) {
-      logger.error('Get patient visits error:', error);
-      return ApiResponse.serverError(res, error.message);
-    }
-  }
-
-  /**
-   * Get visit by ID
-   * @param {Object} req - Request object
-   * @param {Object} res - Response object
-   * @returns {Object} Response
-   */
-  static async getVisitById(req, res) {
-    try {
-      const { id } = req.params;
-      const visit = await PatientService.getVisitById(id);
-      return ApiResponse.success(res, 'Visit retrieved successfully', visit);
-    } catch (error) {
-      logger.error('Get visit by ID error:', error);
-      
-      if (error.message === 'Visit not found') {
-        return ApiResponse.notFound(res, error.message);
-      }
-      
-      return ApiResponse.serverError(res, error.message);
-    }
-  }
-
-  /**
-   * Update visit
-   * @param {Object} req - Request object
-   * @param {Object} res - Response object
-   * @returns {Object} Response
-   */
-  static async updateVisit(req, res) {
-    try {
-      const { id } = req.params;
-      const visit = await PatientService.updateVisit(id, req.body);
-      return ApiResponse.success(res, 'Visit updated successfully', visit);
-    } catch (error) {
-      logger.error('Update visit error:', error);
-      
-      if (error.message === 'Visit not found') {
-        return ApiResponse.notFound(res, error.message);
-      }
-      
-      return ApiResponse.serverError(res, error.message);
-    }
-  }
-
-  /**
-   * Delete visit
-   * @param {Object} req - Request object
-   * @param {Object} res - Response object
-   * @returns {Object} Response
-   */
-  static async deleteVisit(req, res) {
-    try {
-      const { id } = req.params;
-      await PatientService.deleteVisit(id);
-      return ApiResponse.success(res, 'Visit deleted successfully');
-    } catch (error) {
-      logger.error('Delete visit error:', error);
-      
-      if (error.message === 'Visit not found') {
-        return ApiResponse.notFound(res, error.message);
-      }
-      
       return ApiResponse.serverError(res, error.message);
     }
   }

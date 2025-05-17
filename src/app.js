@@ -7,13 +7,7 @@ const rateLimit = require('express-rate-limit');
 const config = require('./config');
 const errorHandler = require('./api/middlewares/errorHandler');
 const loggerMiddleware = require('./api/middlewares/logger');
-const reportRoutes = require('./api/routes/report.routes');
-const dashboardRoutes = require('./api/routes/dashboard.routes');
-const mobileRoutes = require('./api/routes/mobile.routes');
-const adminRoutes = require('./api/routes/admin.routes');
-const integrationRoutes = require('./api/routes/integration.routes');
-const supportRoutes = require('./api/routes/support.routes');
-
+const swaggerSetup = require('./utils/swagger');
 // Initialize database
 require('./models');
 
@@ -35,13 +29,6 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 // Compress responses
 app.use(compression());
 
-app.use('/api/reports', reportRoutes);
-app.use('/api/dashboard', dashboardRoutes);
-app.use('/api/mobile', mobileRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/integration', integrationRoutes);
-app.use('/api/support', supportRoutes);
-
 // Request logging
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
@@ -58,8 +45,26 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// API routes
+// Decide on ONE of these approaches (not both):
+
+// OPTION 1: Use only the combined routes from index.js
 app.use('/api', require('./api/routes'));
+
+// OPTION 2: Use individual route mounts
+// app.use('/api/reports', require('./api/routes/report.routes'));
+// app.use('/api/dashboard', require('./api/routes/dashboard.routes'));
+// app.use('/api/mobile', require('./api/routes/mobile.routes'));
+// app.use('/api/admin', require('./api/routes/admin.routes'));
+// app.use('/api/integration', require('./api/routes/integration.routes'));
+// app.use('/api/support', require('./api/routes/support.routes'));
+// app.use('/api/auth', require('./api/routes/auth.routes'));
+// app.use('/api/users', require('./api/routes/user.routes'));
+// app.use('/api/facilities', require('./api/routes/facility.routes'));
+// app.use('/api/patients', require('./api/routes/patient.routes'));
+// etc...
+
+// Setup Swagger after routes are configured
+swaggerSetup(app);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -72,6 +77,35 @@ app.use((req, res, next) => {
     status: 'error',
     message: `Can't find ${req.originalUrl} on this server`
   });
+});
+
+// Temporary test endpoint
+app.get('/api/test-auth', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({
+      status: 'error',
+      message: 'No token provided',
+    });
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, config.jwt.secret);
+    
+    return res.json({
+      status: 'success',
+      message: 'Token is valid',
+      decoded,
+    });
+  } catch (error) {
+    return res.status(401).json({
+      status: 'error',
+      message: error.message,
+    });
+  }
 });
 
 // Global error handling middleware

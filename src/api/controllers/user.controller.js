@@ -120,11 +120,26 @@ class UserController {
    */
   static async activateUser(req, res) {
     try {
+      console.log('Activate user request received for ID:', req.params.id);
+      
+      // Check if the user has admin role (double-check)
+      if (req.user.role && req.user.role.name) {
+        const roleName = req.user.role.name.toLowerCase();
+        if (roleName !== 'admin' && roleName !== 'administrator' && roleName !== 'health_commissioner') {
+          console.log('Unauthorized attempt to activate user by:', req.user.email);
+          return ApiResponse.forbidden(res, 'Only administrators can activate users');
+        }
+      }
+      
       const { id } = req.params;
+      console.log(`Processing activation request for user ID: ${id}`);
+      
       const user = await UserService.activateUser(id);
+      console.log(`User activated successfully: ${user.email}`);
+      
       return ApiResponse.success(res, 'User activated successfully', user);
     } catch (error) {
-      logger.error('Activate user error:', error);
+      console.error('Activate user error:', error);
       
       if (error.message === 'User not found') {
         return ApiResponse.notFound(res, error.message);

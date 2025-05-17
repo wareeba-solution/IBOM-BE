@@ -185,33 +185,54 @@ class UserService {
    */
   static async activateUser(id) {
     try {
-      // Find user
-      const user = await User.findByPk(id);
-
-      if (!user) {
-        throw new Error('User not found');
-      }
-
-      // Activate user
-      await user.update({ status: 'active' });
-
-      // Get updated user
-      const activatedUser = await User.findByPk(id, {
+      console.log(`Activating user with ID: ${id}`);
+      
+      // Find user with relationships
+      const user = await db.User.findByPk(id, {
         include: [
           {
-            model: Role,
+            model: db.Role,
             as: 'role',
           },
           {
-            model: Facility,
+            model: db.Facility,
             as: 'facility',
           },
         ],
-        attributes: { exclude: ['password', 'resetToken', 'resetTokenExpiry'] },
       });
-
-      return activatedUser;
+      
+      if (!user) {
+        console.log(`User with ID ${id} not found`);
+        throw new Error('User not found');
+      }
+      
+      console.log(`Found user: ${user.email} with status: ${user.status}`);
+      
+      // Update user status
+      await user.update({ status: 'active' });
+      console.log(`User ${user.email} activated successfully`);
+      
+      // Return user without sensitive information
+      return {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        status: user.status,
+        role: user.role ? {
+          id: user.role.id,
+          name: user.role.name,
+        } : null,
+        facility: user.facility ? {
+          id: user.facility.id,
+          name: user.facility.name,
+        } : null,
+        createdAt: user.createdAt,
+        updatedAt: user.updatedAt,
+      };
     } catch (error) {
+      console.error(`Error activating user: ${error.message}`);
       throw error;
     }
   }
