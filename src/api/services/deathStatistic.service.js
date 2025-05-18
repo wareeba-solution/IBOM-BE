@@ -7,16 +7,23 @@ const { AppError } = require('../../utils/error');
 class DeathStatisticService {
   async createDeathStatistic(data, userId) {
     try {
-      // Check if patient exists
-      const patient = await db.Patient.findByPk(data.patientId);
-      if (!patient) {
-        throw new AppError('Patient not found', 404);
+      let patientId = data.patientId;
+      let facilityId = data.facilityId;
+      
+      // If patient ID is provided, check if patient exists
+      if (patientId) {
+        const patient = await db.Patient.findByPk(patientId);
+        if (!patient) {
+          throw new AppError('Patient not found', 404);
+        }
       }
 
-      // Check if facility exists
-      const facility = await db.Facility.findByPk(data.facilityId);
-      if (!facility) {
-        throw new AppError('Facility not found', 404);
+      // If facility ID is provided, check if facility exists
+      if (facilityId) {
+        const facility = await db.Facility.findByPk(facilityId);
+        if (!facility) {
+          throw new AppError('Facility not found', 404);
+        }
       }
 
       // Create death statistic
@@ -25,12 +32,16 @@ class DeathStatisticService {
         createdBy: userId,
       });
 
-      // Update patient record to mark as deceased
-      await patient.update({
-        isDeceased: true,
-        dateOfDeath: data.dateOfDeath,
-        updatedBy: userId,
-      });
+      // Update patient record to mark as deceased if we have a patient
+      if (patientId) {
+        await db.Patient.update({
+          isDeceased: true,
+          dateOfDeath: data.date_of_death || data.dateOfDeath,
+          updatedBy: userId,
+        }, {
+          where: { id: patientId }
+        });
+      }
 
       return deathStatistic;
     } catch (error) {
@@ -49,19 +60,22 @@ class DeathStatisticService {
             model: db.Patient,
             as: 'patient',
             attributes: ['id', 'firstName', 'lastName', 'gender', 'dateOfBirth'],
+            required: false
           },
           {
             model: db.Facility,
             as: 'facility',
-            attributes: ['id', 'name', 'type', 'lga'],
+            // Use the correct column names
+            attributes: ['id', 'name', 'facilityType', 'lga'],
+            required: false
           },
         ],
       });
-
+  
       if (!deathStatistic) {
         throw new AppError('Death statistic not found', 404);
       }
-
+  
       return deathStatistic;
     } catch (error) {
       if (error instanceof AppError) {
@@ -83,11 +97,11 @@ class DeathStatisticService {
         updatedBy: userId,
       });
 
-      if (data.dateOfDeath) {
-        // Update patient's death date if it changed
+      // Update patient's death date if it changed
+      if ((data.date_of_death || data.dateOfDeath) && deathStatistic.patientId) {
         await db.Patient.update(
           {
-            dateOfDeath: data.dateOfDeath,
+            dateOfDeath: data.date_of_death || data.dateOfDeath,
             updatedBy: userId,
           },
           {
@@ -115,17 +129,19 @@ class DeathStatisticService {
       // Instead of completely deleting, we can soft delete if necessary
       await deathStatistic.destroy();
 
-      // Reset patient's deceased status
-      await db.Patient.update(
-        {
-          isDeceased: false,
-          dateOfDeath: null,
-          updatedBy: userId,
-        },
-        {
-          where: { id: deathStatistic.patientId },
-        }
-      );
+      // Reset patient's deceased status if we have a patient
+      if (deathStatistic.patientId) {
+        await db.Patient.update(
+          {
+            isDeceased: false,
+            dateOfDeath: null,
+            updatedBy: userId,
+          },
+          {
+            where: { id: deathStatistic.patientId },
+          }
+        );
+      }
 
       return { message: 'Death statistic deleted successfully' };
     } catch (error) {
@@ -141,14 +157,18 @@ class DeathStatisticService {
       const {
         patientId,
         facilityId,
-        dateFrom,
-        dateTo,
-        mannerOfDeath,
-        autopsyPerformed,
-        page,
-        limit,
-        sortBy,
-        sortOrder,
+        deceased_name,
+        date_from,
+        date_to,
+        manner_of_death,
+        cause_of_death,
+        city,
+        state,
+        status,
+        page = 1,
+        limit = 10,
+        sort_by = 'createdAt',
+        sort_order = 'DESC',
       } = criteria;
 
       const where = {};
@@ -161,24 +181,49 @@ class DeathStatisticService {
         where.facilityId = facilityId;
       }
       
-      if (dateFrom || dateTo) {
-        where.dateOfDeath = {};
-        if (dateFrom) {
-          where.dateOfDeath[Op.gte] = new Date(dateFrom);
+      if (deceased_name) {
+        where.deceased_name = {
+          [Op.iLike]: `%${deceased_name}%` 
+        };
+      }
+      
+      if (date_from || date_to) {
+        where.date_of_death = {};
+        if (date_from) {
+          where.date_of_death[Op.gte] = new Date(date_from);
         }
-        if (dateTo) {
-          where.dateOfDeath[Op.lte] = new Date(dateTo);
+        if (date_to) {
+          where.date_of_death[Op.lte] = new Date(date_to);
         }
       }
       
-      if (mannerOfDeath) {
-        where.mannerOfDeath = mannerOfDeath;
+      if (manner_of_death) {
+        where.manner_of_death = manner_of_death;
       }
       
-      if (autopsyPerformed !== undefined) {
-        where.autopsyPerformed = autopsyPerformed;
+      if (cause_of_death) {
+        where.cause_of_death = {
+          [Op.iLike]: `%${cause_of_death}%`
+        };
+      }
+      
+      if (city) {
+        where.city = {
+          [Op.iLike]: `%${city}%`
+        };
+      }
+      
+      if (state) {
+        where.state = {
+          [Op.iLike]: `%${state}%`
+        };
+      }
+      
+      if (status) {
+        where.status = status;
       }
 
+      const sortField = sort_by === 'created_at' ? 'createdAt' : sort_by;
       const offset = (page - 1) * limit;
       
       const { count, rows } = await db.DeathStatistic.findAndCountAll({
@@ -188,16 +233,19 @@ class DeathStatisticService {
             model: db.Patient,
             as: 'patient',
             attributes: ['id', 'firstName', 'lastName', 'gender', 'dateOfBirth'],
+            required: false
           },
           {
             model: db.Facility,
             as: 'facility',
-            attributes: ['id', 'name', 'type', 'lga'],
+            // Changed 'type' to 'facilityType' here
+            attributes: ['id', 'name', 'facilityType', 'lga'],
+            required: false
           },
         ],
-        order: [[sortBy, sortOrder]],
-        limit,
-        offset,
+        order: [[sortField, sort_order]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
       });
 
       const totalPages = Math.ceil(count / limit);
@@ -207,8 +255,8 @@ class DeathStatisticService {
         pagination: {
           totalItems: count,
           totalPages,
-          currentPage: page,
-          itemsPerPage: limit,
+          currentPage: parseInt(page),
+          itemsPerPage: parseInt(limit),
         },
       };
     } catch (error) {
@@ -232,12 +280,12 @@ class DeathStatisticService {
       }
       
       if (dateFrom || dateTo) {
-        where.dateOfDeath = {};
+        where.date_of_death = {};
         if (dateFrom) {
-          where.dateOfDeath[Op.gte] = new Date(dateFrom);
+          where.date_of_death[Op.gte] = new Date(dateFrom);
         }
         if (dateTo) {
-          where.dateOfDeath[Op.lte] = new Date(dateTo);
+          where.date_of_death[Op.lte] = new Date(dateTo);
         }
       }
 
@@ -248,17 +296,17 @@ class DeathStatisticService {
       switch (groupBy) {
         case 'cause':
           attributes = [
-            'primaryCauseOfDeath',
+            'cause_of_death',
             [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count'],
           ];
-          group = ['primaryCauseOfDeath'];
+          group = ['cause_of_death'];
           break;
         case 'manner':
           attributes = [
-            'mannerOfDeath',
+            'manner_of_death',
             [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count'],
           ];
-          group = ['mannerOfDeath'];
+          group = ['manner_of_death'];
           break;
         case 'facility':
           attributes = [
@@ -269,10 +317,10 @@ class DeathStatisticService {
           break;
         case 'month':
           attributes = [
-            [db.sequelize.fn('DATE_TRUNC', 'month', db.sequelize.col('dateOfDeath')), 'month'],
+            [db.sequelize.fn('DATE_TRUNC', 'month', db.sequelize.col('date_of_death')), 'month'],
             [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count'],
           ];
-          group = [db.sequelize.fn('DATE_TRUNC', 'month', db.sequelize.col('dateOfDeath'))];
+          group = [db.sequelize.fn('DATE_TRUNC', 'month', db.sequelize.col('date_of_death'))];
           break;
         default:
           throw new AppError('Invalid groupBy parameter', 400);
@@ -285,6 +333,7 @@ class DeathStatisticService {
             model: db.Facility,
             as: 'facility',
             attributes: [],
+            required: false
           },
         ] : [],
         where,
