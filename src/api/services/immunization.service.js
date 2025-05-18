@@ -7,24 +7,86 @@ const { AppError } = require('../../utils/error');
 class ImmunizationService {
   async createImmunization(data, userId) {
     try {
+      // Backend data only
+      const backendData = { ...data };
+      
+      // Handle frontend field names
+      if (data.patient_id) backendData.patientId = data.patient_id;
+      if (data.facility_id) backendData.facilityId = data.facility_id;
+      if (data.vaccine_type) {
+        backendData.vaccineType = data.vaccine_type;
+        // Default vaccineName to vaccineType if not provided
+        if (!backendData.vaccineName && !data.vaccine_name) {
+          backendData.vaccineName = data.vaccine_type;
+        }
+      }
+      if (data.vaccine_name) backendData.vaccineName = data.vaccine_name;
+      if (data.dose_number) backendData.doseNumber = data.dose_number;
+      if (data.lot_number) backendData.batchNumber = data.lot_number;
+      if (data.vaccination_date) backendData.administrationDate = data.vaccination_date;
+      if (data.expiry_date) backendData.expiryDate = data.expiry_date;
+      if (data.healthcare_provider) backendData.administeredBy = data.healthcare_provider;
+      if (data.site_of_administration) backendData.administrationSite = data.site_of_administration;
+      if (data.route_of_administration) backendData.administrationRoute = data.route_of_administration;
+      if (data.next_due_date) backendData.nextDoseDate = data.next_due_date;
+      if (data.provider_id) backendData.providerId = data.provider_id;
+      if (data.weight_kg) backendData.weightKg = data.weight_kg;
+      if (data.height_cm) backendData.heightCm = data.height_cm;
+      if (data.age_months) backendData.ageMonths = data.age_months;
+      if (data.side_effects) backendData.sideEffects = data.side_effects;
+      
+      // Map status values
+      if (data.status) {
+        const statusMap = {
+          'completed': 'Administered',
+          'pending': 'Scheduled',
+          'missed': 'Missed',
+          'cancelled': 'Cancelled'
+        };
+        backendData.status = statusMap[data.status.toLowerCase()] || data.status;
+      }
+      
+      // If vaccineName is not provided, default to vaccineType
+      if (!backendData.vaccineName && backendData.vaccineType) {
+        backendData.vaccineName = backendData.vaccineType;
+      }
+      
+      // If expiryDate is not provided, default to administrationDate + 2 years
+      if (!backendData.expiryDate && backendData.administrationDate) {
+        const administrationDate = new Date(backendData.administrationDate);
+        backendData.expiryDate = new Date(administrationDate);
+        backendData.expiryDate.setFullYear(administrationDate.getFullYear() + 2);
+      }
+      
       // Check if patient exists
-      const patient = await db.Patient.findByPk(data.patientId);
+      const patientId = backendData.patientId;
+      if (!patientId) {
+        throw new AppError('Patient ID is required', 400);
+      }
+      
+      const patient = await db.Patient.findByPk(patientId);
       if (!patient) {
         throw new AppError('Patient not found', 404);
       }
-
+  
       // Check if facility exists
-      const facility = await db.Facility.findByPk(data.facilityId);
+      const facilityId = backendData.facilityId;
+      if (!facilityId) {
+        throw new AppError('Facility ID is required', 400);
+      }
+      
+      const facility = await db.Facility.findByPk(facilityId);
       if (!facility) {
         throw new AppError('Facility not found', 404);
       }
-
+  
+      // Add the user who created the record
+      backendData.createdBy = userId;
+  
       // Create immunization record
-      const immunization = await db.Immunization.create({
-        ...data,
-        createdBy: userId,
-      });
-
+      const immunization = await db.Immunization.create(backendData);
+  
+      // Return the created record
       return immunization;
     } catch (error) {
       if (error instanceof AppError) {
@@ -46,7 +108,7 @@ class ImmunizationService {
           {
             model: db.Facility,
             as: 'facility',
-            attributes: ['id', 'name', 'type', 'lga'],
+            attributes: ['id', 'name', 'facilityType', 'lga'],
           },
         ],
       });
@@ -71,6 +133,7 @@ class ImmunizationService {
         throw new AppError('Immunization record not found', 404);
       }
 
+      // Update with the data directly
       await immunization.update({
         ...data,
         updatedBy: userId,
@@ -106,33 +169,42 @@ class ImmunizationService {
 
   async searchImmunizations(criteria) {
     try {
+      // Extract search parameters directly
       const {
         patientId,
+        patient_id,
         facilityId,
+        facility_id,
         vaccineType,
+        vaccine_type,
         vaccineName,
         dateFrom,
+        date_from,
         dateTo,
+        date_to,
         status,
-        page,
-        limit,
-        sortBy,
-        sortOrder,
+        page = 1,
+        limit = 10,
+        sortBy = 'createdAt',
+        sortOrder = 'DESC',
+        sort_by,
+        sort_order,
       } = criteria;
 
       const where = {};
       
-      if (patientId) {
-        where.patientId = patientId;
+      // Handle both naming conventions for flexibility
+      if (patientId || patient_id) {
+        where.patientId = patientId || patient_id;
       }
       
-      if (facilityId) {
-        where.facilityId = facilityId;
+      if (facilityId || facility_id) {
+        where.facilityId = facilityId || facility_id;
       }
       
-      if (vaccineType) {
+      if (vaccineType || vaccine_type) {
         where.vaccineType = {
-          [Op.iLike]: `%${vaccineType}%`
+          [Op.iLike]: `%${vaccineType || vaccine_type}%`
         };
       }
       
@@ -142,13 +214,13 @@ class ImmunizationService {
         };
       }
       
-      if (dateFrom || dateTo) {
+      if (dateFrom || date_from || dateTo || date_to) {
         where.administrationDate = {};
-        if (dateFrom) {
-          where.administrationDate[Op.gte] = new Date(dateFrom);
+        if (dateFrom || date_from) {
+          where.administrationDate[Op.gte] = new Date(dateFrom || date_from);
         }
-        if (dateTo) {
-          where.administrationDate[Op.lte] = new Date(dateTo);
+        if (dateTo || date_to) {
+          where.administrationDate[Op.lte] = new Date(dateTo || date_to);
         }
       }
       
@@ -157,6 +229,20 @@ class ImmunizationService {
       }
 
       const offset = (page - 1) * limit;
+      
+      // Handle sort field mapping
+      let effectiveSortBy = sortBy;
+      if (sort_by) {
+        const sortFieldMap = {
+          'vaccination_date': 'administrationDate',
+          'next_due_date': 'nextDoseDate',
+          'created_at': 'createdAt',
+          'updated_at': 'updatedAt'
+        };
+        effectiveSortBy = sortFieldMap[sort_by] || sort_by;
+      }
+      
+      const effectiveSortOrder = sort_order || sortOrder;
       
       const { count, rows } = await db.Immunization.findAndCountAll({
         where,
@@ -169,12 +255,12 @@ class ImmunizationService {
           {
             model: db.Facility,
             as: 'facility',
-            attributes: ['id', 'name', 'type', 'lga'],
+            attributes: ['id', 'name', 'facilityType', 'lga'],
           },
         ],
-        order: [[sortBy, sortOrder]],
-        limit,
-        offset,
+        order: [[effectiveSortBy, effectiveSortOrder]],
+        limit: parseInt(limit),
+        offset: parseInt(offset),
       });
 
       const totalPages = Math.ceil(count / limit);
@@ -184,8 +270,8 @@ class ImmunizationService {
         pagination: {
           totalItems: count,
           totalPages,
-          currentPage: page,
-          itemsPerPage: limit,
+          currentPage: parseInt(page),
+          itemsPerPage: parseInt(limit),
         },
       };
     } catch (error) {
@@ -208,7 +294,7 @@ class ImmunizationService {
           {
             model: db.Facility,
             as: 'facility',
-            attributes: ['id', 'name', 'type', 'lga'],
+            attributes: ['id', 'name', 'facilityType', 'lga'],
           },
         ],
         order: [
@@ -251,35 +337,53 @@ class ImmunizationService {
 
   async scheduleImmunization(data, userId) {
     try {
+      // Handle both frontend and backend field names
+      const patientId = data.patientId || data.patient_id;
+      const facilityId = data.facilityId || data.facility_id;
+      const vaccineType = data.vaccineType || data.vaccine_type;
+      const vaccineName = data.vaccineName || data.vaccine_name || vaccineType;
+      const doseNumber = data.doseNumber || data.dose_number;
+      const scheduledDate = data.scheduledDate || data.scheduled_date;
+      const notes = data.notes;
+      const providerId = data.providerId || data.provider_id;
+      const weightKg = data.weightKg || data.weight_kg;
+      const heightCm = data.heightCm || data.height_cm;
+      const ageMonths = data.ageMonths || data.age_months;
+      
       // Check if patient exists
-      const patient = await db.Patient.findByPk(data.patientId);
+      const patient = await db.Patient.findByPk(patientId);
       if (!patient) {
         throw new AppError('Patient not found', 404);
       }
 
       // Check if facility exists
-      const facility = await db.Facility.findByPk(data.facilityId);
+      const facility = await db.Facility.findByPk(facilityId);
       if (!facility) {
         throw new AppError('Facility not found', 404);
       }
 
       // Create scheduled immunization
       const immunization = await db.Immunization.create({
-        patientId: data.patientId,
-        facilityId: data.facilityId,
-        vaccineType: data.vaccineType,
-        vaccineName: data.vaccineName,
-        doseNumber: data.doseNumber,
-        administrationDate: data.scheduledDate,
+        patientId,
+        facilityId,
+        vaccineType,
+        vaccineName,
+        doseNumber,
+        administrationDate: scheduledDate,
         status: 'Scheduled',
-        notes: data.notes,
+        notes,
         createdBy: userId,
         // Default values for required fields that will be updated when administered
         batchNumber: 'TBD',
-        expiryDate: new Date(data.scheduledDate),
+        expiryDate: new Date(scheduledDate),
         administeredBy: 'TBD',
         administrationSite: 'Other',
         administrationRoute: 'Other',
+        // Add new fields
+        providerId,
+        weightKg,
+        heightCm,
+        ageMonths,
       });
 
       return immunization;
@@ -293,13 +397,12 @@ class ImmunizationService {
 
   async getDueImmunizations(criteria) {
     try {
-      const { 
-        facilityId, 
-        dateFrom, 
-        dateTo,
-        page,
-        limit 
-      } = criteria;
+      // Handle both naming conventions
+      const facilityId = criteria.facilityId || criteria.facility_id;
+      const dateFrom = criteria.dateFrom || criteria.date_from;
+      const dateTo = criteria.dateTo || criteria.date_to;
+      const page = parseInt(criteria.page) || 1;
+      const limit = parseInt(criteria.limit) || 10;
 
       const where = {
         status: 'Scheduled',
@@ -331,12 +434,12 @@ class ImmunizationService {
           {
             model: db.Facility,
             as: 'facility',
-            attributes: ['id', 'name', 'type', 'lga'],
+            attributes: ['id', 'name', 'facilityType', 'lga'],
           },
         ],
         order: [['administrationDate', 'ASC']],
-        limit,
-        offset,
+        limit: parseInt(limit),
+        offset: parseInt(offset),
       });
 
       const totalPages = Math.ceil(count / limit);
@@ -346,8 +449,8 @@ class ImmunizationService {
         pagination: {
           totalItems: count,
           totalPages,
-          currentPage: page,
-          itemsPerPage: limit,
+          currentPage: parseInt(page),
+          itemsPerPage: parseInt(limit),
         },
       };
     } catch (error) {
@@ -357,8 +460,17 @@ class ImmunizationService {
 
   async getImmunizationStatistics(criteria) {
     try {
-      const { facilityId, dateFrom, dateTo, groupBy } = criteria;
-
+      // Handle both naming conventions
+      const facilityId = criteria.facilityId || criteria.facility_id;
+      const dateFrom = criteria.dateFrom || criteria.date_from;
+      const dateTo = criteria.dateTo || criteria.date_to;
+      const groupBy = criteria.groupBy || criteria.group_by;
+  
+      // Validate required parameters
+      if (!groupBy) {
+        throw new AppError('groupBy parameter is required', 400);
+      }
+  
       const where = {};
       
       if (facilityId) {
@@ -374,94 +486,130 @@ class ImmunizationService {
           where.administrationDate[Op.lte] = new Date(dateTo);
         }
       }
-
+  
       where.status = 'Administered';
-
+  
+      // Special case for age statistics - use raw SQL with explicit subquery
+      if (groupBy === 'age') {
+        // Create condition strings for the query
+        const facilityCondition = facilityId ? `AND i."facilityId" = :facilityId` : '';
+        const dateFromCondition = dateFrom ? `AND i."administrationDate" >= :dateFrom` : '';
+        const dateToCondition = dateTo ? `AND i."administrationDate" <= :dateTo` : '';
+        
+        // Define the query with placeholders for parameters
+        const ageQuery = `
+          WITH age_groups AS (
+            SELECT 
+              CASE 
+                WHEN EXTRACT(YEAR FROM AGE(NOW(), p."dateOfBirth")) < 1 THEN '< 1 year'
+                WHEN EXTRACT(YEAR FROM AGE(NOW(), p."dateOfBirth")) < 5 THEN '1-4 years'
+                WHEN EXTRACT(YEAR FROM AGE(NOW(), p."dateOfBirth")) < 12 THEN '5-11 years'
+                WHEN EXTRACT(YEAR FROM AGE(NOW(), p."dateOfBirth")) < 18 THEN '12-17 years'
+                ELSE '18+ years'
+              END AS age_group,
+              i.id
+            FROM 
+              "Immunizations" i
+            JOIN 
+              "Patients" p ON i."patientId" = p.id
+            WHERE 
+              i.status = 'Administered'
+              ${facilityCondition}
+              ${dateFromCondition}
+              ${dateToCondition}
+              AND i."deletedAt" IS NULL
+          )
+          SELECT 
+            age_group,
+            COUNT(*) AS count
+          FROM 
+            age_groups
+          GROUP BY 
+            age_group
+          ORDER BY 
+            CASE 
+              WHEN age_group = '< 1 year' THEN 1
+              WHEN age_group = '1-4 years' THEN 2
+              WHEN age_group = '5-11 years' THEN 3
+              WHEN age_group = '12-17 years' THEN 4
+              ELSE 5
+            END ASC
+        `;
+        
+        // Define replacement parameters
+        const replacements = {};
+        if (facilityId) replacements.facilityId = facilityId;
+        if (dateFrom) replacements.dateFrom = dateFrom;
+        if (dateTo) replacements.dateTo = dateTo;
+        
+        // Execute the raw query
+        const results = await db.sequelize.query(
+          ageQuery, 
+          { 
+            replacements,
+            type: db.sequelize.QueryTypes.SELECT 
+          }
+        );
+        
+        // Make sure we always return an array
+        return Array.isArray(results) ? results : [];
+      }
+      
+      // For other grouping types, use the Sequelize approach
       let attributes = [];
       let group = [];
+      let orderBy = [];
+      let includes = [];
       
       // Configure grouping based on parameter
       switch (groupBy) {
         case 'vaccine':
           attributes = [
-            'vaccineType',
+            ['vaccineType', 'vaccine_type'], // Consistent field naming
             [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count'],
           ];
           group = ['vaccineType'];
+          orderBy = [['vaccineType', 'ASC']];
           break;
+          
         case 'facility':
           attributes = [
-            [db.sequelize.col('facility.name'), 'facilityName'],
+            [db.sequelize.col('facility.name'), 'facility_name'], // Consistent field naming
             [db.sequelize.fn('COUNT', db.sequelize.col('Immunization.id')), 'count'],
           ];
           group = [db.sequelize.col('facility.name')];
+          includes = [{
+            model: db.Facility,
+            as: 'facility',
+            attributes: [],
+          }];
           break;
+          
         case 'month':
           attributes = [
             [db.sequelize.fn('DATE_TRUNC', 'month', db.sequelize.col('administrationDate')), 'month'],
             [db.sequelize.fn('COUNT', db.sequelize.col('id')), 'count'],
           ];
           group = [db.sequelize.fn('DATE_TRUNC', 'month', db.sequelize.col('administrationDate'))];
+          orderBy = [[db.sequelize.literal('month'), 'ASC']];
           break;
-        case 'age':
-          // This would require joining with patients and calculating age group
-          attributes = [
-            [
-              db.sequelize.literal(`
-                CASE 
-                  WHEN EXTRACT(YEAR FROM AGE(NOW(), "patient"."dateOfBirth")) < 1 THEN '< 1 year'
-                  WHEN EXTRACT(YEAR FROM AGE(NOW(), "patient"."dateOfBirth")) < 5 THEN '1-4 years'
-                  WHEN EXTRACT(YEAR FROM AGE(NOW(), "patient"."dateOfBirth")) < 12 THEN '5-11 years'
-                  WHEN EXTRACT(YEAR FROM AGE(NOW(), "patient"."dateOfBirth")) < 18 THEN '12-17 years'
-                  ELSE '18+ years'
-                END
-              `),
-              'ageGroup'
-            ],
-            [db.sequelize.fn('COUNT', db.sequelize.col('Immunization.id')), 'count'],
-          ];
-          group = [
-            db.sequelize.literal(`
-              CASE 
-                WHEN EXTRACT(YEAR FROM AGE(NOW(), "patient"."dateOfBirth")) < 1 THEN '< 1 year'
-                WHEN EXTRACT(YEAR FROM AGE(NOW(), "patient"."dateOfBirth")) < 5 THEN '1-4 years'
-                WHEN EXTRACT(YEAR FROM AGE(NOW(), "patient"."dateOfBirth")) < 12 THEN '5-11 years'
-                WHEN EXTRACT(YEAR FROM AGE(NOW(), "patient"."dateOfBirth")) < 18 THEN '12-17 years'
-                ELSE '18+ years'
-              END
-            `)
-          ];
-          break;
+          
         default:
-          throw new AppError('Invalid groupBy parameter', 400);
+          throw new AppError(`Invalid groupBy parameter: ${groupBy}`, 400);
       }
-
+  
       const results = await db.Immunization.findAll({
         attributes,
-        include: [
-          ...(groupBy === 'facility' ? [{
-            model: db.Facility,
-            as: 'facility',
-            attributes: [],
-          }] : []),
-          ...(groupBy === 'age' ? [{
-            model: db.Patient,
-            as: 'patient',
-            attributes: [],
-          }] : []),
-        ],
+        include: includes,
         where,
         group,
+        order: orderBy,
         raw: true,
-        order: groupBy === 'age' ? 
-          [[db.sequelize.literal('ageGroup'), 'ASC']] : 
-          groupBy === 'month' ? 
-            [[db.sequelize.literal('month'), 'ASC']] : 
-            [[groupBy === 'facility' ? 'facilityName' : 'vaccineType', 'ASC']],
       });
-
+  
       return results;
     } catch (error) {
+      console.error('Error in getImmunizationStatistics:', error);
       if (error instanceof AppError) {
         throw error;
       }
