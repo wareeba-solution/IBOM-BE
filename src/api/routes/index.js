@@ -12,6 +12,8 @@ const immunizationRoutes = require('./immunization.routes'); // Add this line
 const diseaseRoutes = require('./disease.routes'); // Add this line
 const familyPlanningRoutes = require('./familyPlanning.routes'); // Add this line
 const dataImportRoutes = require('./dataImport.routes'); // Add this line
+const antenatalRoutes = require('./antenatal.routes');
+
 
 // Define API routes
 router.get('/', (req, res) => {
@@ -33,6 +35,7 @@ router.use('/immunizations', immunizationRoutes); // Add this line
 router.use('/diseases', diseaseRoutes); // Add this line
 router.use('/family-planning', familyPlanningRoutes); // Add this line
 router.use('/data-import', dataImportRoutes); // Add this line
+router.use('/antenatal', antenatalRoutes);
 
 // Export router for use in app.js
 module.exports = router;

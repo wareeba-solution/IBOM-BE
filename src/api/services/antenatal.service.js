@@ -12,18 +12,18 @@ class AntenatalService {
             if (!patient) {
                 throw new AppError('Patient not found', 404);
             }
-
+    
             // Check if facility exists
             const facility = await db.Facility.findByPk(data.facilityId);
             if (!facility) {
                 throw new AppError('Facility not found', 404);
             }
-
+    
             // Check if patient gender is female
-            if (patient.gender !== 'Female') {
+            if (patient.gender.toLowerCase() !== 'female') {
                 throw new AppError('Antenatal care can only be registered for female patients', 400);
             }
-
+    
             // Check if patient already has an active antenatal care record
             const existingActiveRecord = await db.AntenatalCare.findOne({
                 where: {
@@ -31,17 +31,35 @@ class AntenatalService {
                     status: 'Active',
                 },
             });
-
+    
             if (existingActiveRecord) {
                 throw new AppError('Patient already has an active antenatal care record', 400);
             }
-
+    
+            // Generate registration number if not provided
+            if (!data.registrationNumber) {
+                // Get facility code (first 3 letters) for prefix
+                const facilityCode = facility.name.substring(0, 3).toUpperCase();
+                
+                // Get current date components
+                const currentDate = new Date();
+                const year = currentDate.getFullYear().toString().slice(-2); // Last 2 digits of year
+                const month = String(currentDate.getMonth() + 1).padStart(2, '0'); // Month (01-12)
+                
+                // Generate random part (4 digits)
+                const random = Math.floor(1000 + Math.random() * 9000);
+                
+                // Format: [Facility Code]-ANC-[YY][MM]-[Random]
+                // Example: AKW-ANC-2505-4321
+                data.registrationNumber = `${facilityCode}-ANC-${year}${month}-${random}`;
+            }
+    
             // Create antenatal care record
             const antenatalCare = await db.AntenatalCare.create({
                 ...data,
                 createdBy: userId,
             });
-
+    
             return antenatalCare;
         } catch (error) {
             if (error instanceof AppError) {
@@ -62,7 +80,7 @@ class AntenatalService {
                 {
                     model: db.Facility,
                     as: 'facility',
-                    attributes: ['id', 'name', 'type', 'lga'],
+                    attributes: ['id', 'name', 'facilityType', 'lga'],
                 },
             ];
 
@@ -147,10 +165,10 @@ class AntenatalService {
                 status,
                 outcome,
                 hivStatus,
-                page,
-                limit,
-                sortBy,
-                sortOrder,
+                page = 1,
+                limit = 10,
+                sortBy = 'createdAt',
+                sortOrder = 'DESC',
             } = criteria;
 
             const where = {};
@@ -162,7 +180,6 @@ class AntenatalService {
             if (facilityId) {
                 where.facilityId = facilityId;
             }
-            // src/api/services/antenatal.service.js (continued)
 
             if (registrationDateFrom || registrationDateTo) {
                 where.registrationDate = {};
@@ -209,7 +226,7 @@ class AntenatalService {
                     {
                         model: db.Facility,
                         as: 'facility',
-                        attributes: ['id', 'name', 'type', 'lga'],
+                        attributes: ['id', 'name', 'facilityType', 'lga'],
                     },
                 ],
                 order: [[sortBy, sortOrder]],
@@ -367,10 +384,10 @@ class AntenatalService {
                 visitDateTo,
                 minGestationalAge,
                 maxGestationalAge,
-                page,
-                limit,
-                sortBy,
-                sortOrder,
+                page = 1,
+                limit = 10,
+                sortBy = 'visitDate',
+                sortOrder = 'DESC',
             } = criteria;
 
             const where = {};
@@ -423,7 +440,7 @@ class AntenatalService {
                             {
                                 model: db.Facility,
                                 as: 'facility',
-                                attributes: ['id', 'name', 'type', 'lga'],
+                                attributes: ['id', 'name', 'facilityType', 'lga'],
                             },
                         ],
                     },
@@ -628,8 +645,8 @@ class AntenatalService {
                 facilityId,
                 dateFrom,
                 dateTo,
-                page,
-                limit
+                page = 1,
+                limit = 10
             } = criteria;
 
             // Get the latest visit for each antenatal care record with a next appointment
@@ -641,8 +658,8 @@ class AntenatalService {
             av."nextAppointment",
             ac."patientId",
             ac."facilityId"
-          FROM antenatal_visits av
-          JOIN antenatal_care ac ON av."antenatalCareId" = ac.id
+          FROM "AntenatalVisit" av
+          JOIN "AntenatalCare" ac ON av."antenatalCareId" = ac.id
           WHERE av."nextAppointment" IS NOT NULL
             AND ac.status = 'Active'
             ${facilityId ? `AND ac."facilityId" = '${facilityId}'` : ''}
@@ -665,9 +682,9 @@ class AntenatalService {
           f.id AS "facilityId",
           f.name AS "facilityName"
         FROM LatestVisits lv
-        JOIN antenatal_care ac ON lv."antenatalCareId" = ac.id
-        JOIN patients p ON ac."patientId" = p.id
-        JOIN facilities f ON ac."facilityId" = f.id
+        JOIN "AntenatalCare" ac ON lv."antenatalCareId" = ac.id
+        JOIN "Patients" p ON ac."patientId" = p.id
+        JOIN "Facilities" f ON ac."facilityId" = f.id
         ORDER BY lv."nextAppointment" ASC
         ${limit ? `LIMIT ${limit}` : ''}
         ${page && limit ? `OFFSET ${(page - 1) * limit}` : ''}
@@ -678,8 +695,8 @@ class AntenatalService {
         WITH LatestVisits AS (
           SELECT DISTINCT ON (av."antenatalCareId") 
             av.id
-          FROM antenatal_visits av
-          JOIN antenatal_care ac ON av."antenatalCareId" = ac.id
+          FROM "AntenatalVisit" av
+          JOIN "AntenatalCare" ac ON av."antenatalCareId" = ac.id
           WHERE av."nextAppointment" IS NOT NULL
             AND ac.status = 'Active'
             ${facilityId ? `AND ac."facilityId" = '${facilityId}'` : ''}
@@ -696,7 +713,7 @@ class AntenatalService {
                 db.sequelize.query(countQuery, { type: db.sequelize.QueryTypes.SELECT }),
             ]);
 
-            const count = parseInt(countResults[0].total);
+            const count = parseInt(countResults[0]?.total || 0);
             const totalPages = Math.ceil(count / limit);
 
             return {
