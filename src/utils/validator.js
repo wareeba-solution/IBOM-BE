@@ -45,7 +45,21 @@ const commonSchemas = {
   })
 };
 
+/**
+ * Validates input data against a Joi schema
+ * @param {Object} schema - Joi schema
+ * @param {Object} data - Data to validate
+ * @returns {Object} - { error, value }
+ */
+const validateInput = (schema, data) => {
+  return schema.validate(data, {
+    abortEarly: false,
+    stripUnknown: true
+  });
+};
+
 module.exports = {
   validateRequest,
-  commonSchemas
+  commonSchemas,
+  validateInput  // Add this export
 };

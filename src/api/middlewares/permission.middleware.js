@@ -52,7 +52,14 @@ const checkPermission = (permissions) => {
     }
 
     // Admin has all permissions
-    if (req.user.role && req.user.role.name === 'admin') {
+    // if (req.user.role && req.user.role.name === 'admin') {
+    //   return next();
+    // }
+
+    // this is a quick fix to allow admin and administrator roles to have all permissions
+
+    if (req.user.role && (req.user.role.name === 'admin' || req.user.role.name === 'Administrator')) {
+      console.log('Admin role detected - granting all permissions');
       return next();
     }
 
