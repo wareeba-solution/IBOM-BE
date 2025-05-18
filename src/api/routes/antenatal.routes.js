@@ -6,35 +6,9 @@ const antenatalController = require('../controllers/antenatal.controller');
 const { authenticate } = require('../middlewares/auth.middleware');
 const { checkPermission } = require('../middlewares/permission.middleware');
 
-// Antenatal Care Routes
-router.post(
-  '/',
-  authenticate,
-  checkPermission('antenatal:create'),
-  antenatalController.createAntenatalCare
-);
+// Order matters! Put specific routes before parameterized routes
 
-router.get(
-  '/:id',
-  authenticate,
-  checkPermission('antenatal:read'),
-  antenatalController.getAntenatalCareById
-);
-
-router.put(
-  '/:id',
-  authenticate,
-  checkPermission('antenatal:update'),
-  antenatalController.updateAntenatalCare
-);
-
-router.delete(
-  '/:id',
-  authenticate,
-  checkPermission('antenatal:delete'),
-  antenatalController.deleteAntenatalCare
-);
-
+// Search route - no parameters
 router.get(
   '/',
   authenticate,
@@ -42,50 +16,7 @@ router.get(
   antenatalController.searchAntenatalCare
 );
 
-router.post(
-  '/:id/complete',
-  authenticate,
-  checkPermission('antenatal:update'),
-  antenatalController.completeAntenatalCare
-);
-
-// Antenatal Visit Routes
-router.post(
-  '/visits',
-  authenticate,
-  checkPermission('antenatal:create'),
-  antenatalController.createAntenatalVisit
-);
-
-router.get(
-  '/visits/:id',
-  authenticate,
-  checkPermission('antenatal:read'),
-  antenatalController.getAntenatalVisitById
-);
-
-router.put(
-  '/visits/:id',
-  authenticate,
-  checkPermission('antenatal:update'),
-  antenatalController.updateAntenatalVisit
-);
-
-router.delete(
-  '/visits/:id',
-  authenticate,
-  checkPermission('antenatal:delete'),
-  antenatalController.deleteAntenatalVisit
-);
-
-router.get(
-  '/visits',
-  authenticate,
-  checkPermission('antenatal:read'),
-  antenatalController.searchAntenatalVisits
-);
-
-// Statistics and Reports
+// Statistics route
 router.get(
   '/statistics',
   authenticate,
@@ -93,11 +24,92 @@ router.get(
   antenatalController.getAntenatalStatistics
 );
 
+// Due appointments route
 router.get(
   '/appointments/due',
   authenticate,
   checkPermission('antenatal:read'),
   antenatalController.getDueAppointments
+);
+
+// Visits routes - specific
+router.get(
+  '/visits',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalController.searchAntenatalVisits
+);
+
+// Visits by ID
+router.get(
+  '/visits/:id',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalController.getAntenatalVisitById
+);
+
+// Create visit
+router.post(
+  '/visits',
+  authenticate,
+  checkPermission('antenatal:create'),
+  antenatalController.createAntenatalVisit
+);
+
+// Update visit
+router.put(
+  '/visits/:id',
+  authenticate,
+  checkPermission('antenatal:update'),
+  antenatalController.updateAntenatalVisit
+);
+
+// Delete visit
+router.delete(
+  '/visits/:id',
+  authenticate,
+  checkPermission('antenatal:delete'),
+  antenatalController.deleteAntenatalVisit
+);
+
+// Complete antenatal route
+router.post(
+  '/:id/complete',
+  authenticate,
+  checkPermission('antenatal:update'),
+  antenatalController.completeAntenatalCare
+);
+
+// Get antenatal by ID - should be after all specific routes
+router.get(
+  '/:id',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalController.getAntenatalCareById
+);
+
+// Create antenatal
+router.post(
+  '/',
+  authenticate,
+  checkPermission('antenatal:create'),
+  antenatalController.createAntenatalCare
+);
+
+// Update antenatal
+router.put(
+  '/:id',
+  authenticate,
+  checkPermission('antenatal:update'),
+  antenatalController.updateAntenatalCare
+);
+
+// Delete antenatal
+router.delete(
+  '/:id',
+  authenticate,
+  checkPermission('antenatal:delete'),
+  antenatalController.deleteAntenatalCare
 );
 
 module.exports = router;
