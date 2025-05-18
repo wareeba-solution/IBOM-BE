@@ -14,7 +14,10 @@ class ImmunizationController {
     try {
       const { error, value } = validateInput(createImmunizationSchema, req.body);
       if (error) {
-        return res.status(400).json({ error: error.message });
+        return res.status(400).json({ 
+          status: 'error',
+          message: error.message
+        });
       }
 
       const immunization = await immunizationService.createImmunization(
@@ -22,7 +25,11 @@ class ImmunizationController {
         req.user.id
       );
 
-      return res.status(201).json(immunization);
+      return res.status(201).json({
+        status: 'success',
+        message: 'Immunization record created successfully',
+        data: immunization
+      });
     } catch (error) {
       next(error);
     }
@@ -32,7 +39,12 @@ class ImmunizationController {
     try {
       const { id } = req.params;
       const immunization = await immunizationService.getImmunizationById(id);
-      return res.status(200).json(immunization);
+      
+      return res.status(200).json({
+        status: 'success',
+        message: 'Immunization record retrieved successfully',
+        data: immunization
+      });
     } catch (error) {
       next(error);
     }
@@ -41,9 +53,13 @@ class ImmunizationController {
   async updateImmunization(req, res, next) {
     try {
       const { id } = req.params;
+      
       const { error, value } = validateInput(updateImmunizationSchema, req.body);
       if (error) {
-        return res.status(400).json({ error: error.message });
+        return res.status(400).json({ 
+          status: 'error',
+          message: error.message
+        });
       }
 
       const immunization = await immunizationService.updateImmunization(
@@ -52,7 +68,11 @@ class ImmunizationController {
         req.user.id
       );
 
-      return res.status(200).json(immunization);
+      return res.status(200).json({
+        status: 'success',
+        message: 'Immunization record updated successfully',
+        data: immunization
+      });
     } catch (error) {
       next(error);
     }
@@ -62,7 +82,12 @@ class ImmunizationController {
     try {
       const { id } = req.params;
       const result = await immunizationService.deleteImmunization(id);
-      return res.status(200).json(result);
+      
+      return res.status(200).json({
+        status: 'success',
+        message: 'Immunization record deleted successfully',
+        data: result
+      });
     } catch (error) {
       next(error);
     }
@@ -72,11 +97,19 @@ class ImmunizationController {
     try {
       const { error, value } = validateInput(searchImmunizationSchema, req.query);
       if (error) {
-        return res.status(400).json({ error: error.message });
+        return res.status(400).json({ 
+          status: 'error',
+          message: error.message
+        });
       }
 
       const results = await immunizationService.searchImmunizations(value);
-      return res.status(200).json(results);
+      
+      return res.status(200).json({
+        status: 'success',
+        message: 'Immunization records retrieved successfully',
+        data: results
+      });
     } catch (error) {
       next(error);
     }
@@ -86,7 +119,12 @@ class ImmunizationController {
     try {
       const { patientId } = req.params;
       const history = await immunizationService.getPatientImmunizationHistory(patientId);
-      return res.status(200).json(history);
+      
+      return res.status(200).json({
+        status: 'success',
+        message: 'Patient immunization history retrieved successfully',
+        data: history
+      });
     } catch (error) {
       next(error);
     }
@@ -96,7 +134,10 @@ class ImmunizationController {
     try {
       const { error, value } = validateInput(immunizationScheduleSchema, req.body);
       if (error) {
-        return res.status(400).json({ error: error.message });
+        return res.status(400).json({ 
+          status: 'error',
+          message: error.message
+        });
       }
 
       const immunization = await immunizationService.scheduleImmunization(
@@ -104,13 +145,15 @@ class ImmunizationController {
         req.user.id
       );
 
-      return res.status(201).json(immunization);
+      return res.status(201).json({
+        status: 'success',
+        message: 'Immunization scheduled successfully',
+        data: immunization
+      });
     } catch (error) {
       next(error);
     }
   }
-
-  // src/api/controllers/immunization.controller.js (continued)
 
   async getDueImmunizations(req, res, next) {
     try {
@@ -126,7 +169,11 @@ class ImmunizationController {
         limit,
       });
 
-      return res.status(200).json(results);
+      return res.status(200).json({
+        status: 'success',
+        message: 'Due immunizations retrieved successfully',
+        data: results
+      });
     } catch (error) {
       next(error);
     }
@@ -137,7 +184,10 @@ class ImmunizationController {
       const { facilityId, dateFrom, dateTo, groupBy } = req.query;
       
       if (!groupBy || !['vaccine', 'facility', 'month', 'age'].includes(groupBy)) {
-        return res.status(400).json({ error: 'Invalid or missing groupBy parameter' });
+        return res.status(400).json({ 
+          status: 'error',
+          message: 'Invalid or missing groupBy parameter'
+        });
       }
 
       const results = await immunizationService.getImmunizationStatistics({
@@ -147,7 +197,11 @@ class ImmunizationController {
         groupBy,
       });
 
-      return res.status(200).json(results);
+      return res.status(200).json({
+        status: 'success',
+        message: 'Immunization statistics retrieved successfully',
+        data: results
+      });
     } catch (error) {
       next(error);
     }
