@@ -157,26 +157,7 @@ class AntenatalController {
     }
   }
 
-  async getAntenatalStatistics(req, res, next) {
-    try {
-      const { facilityId, dateFrom, dateTo, groupBy } = req.query;
-      
-      if (!groupBy || !['status', 'outcome', 'hivStatus', 'facility', 'month', 'age'].includes(groupBy)) {
-        return res.status(400).json({ error: 'Invalid or missing groupBy parameter' });
-      }
-
-      const results = await antenatalService.getAntenatalStatistics({
-        facilityId,
-        dateFrom,
-        dateTo,
-        groupBy,
-      });
-
-      return res.status(200).json(results);
-    } catch (error) {
-      next(error);
-    }
-  }
+  
 
   async completeAntenatalCare(req, res, next) {
     try {
@@ -218,6 +199,9 @@ class AntenatalController {
       next(error);
     }
   }
+
+
+
 }
 
 module.exports = new AntenatalController();

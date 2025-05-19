@@ -28,10 +28,10 @@ const logResponse = (testName, response) => {
   // Handle different response formats
   if (response.data.id) {
     console.log(`Record ID: ${response.data.id}`);
-    console.log(`Registration Number: ${response.data.registrationNumber}`);
-    console.log(`Patient ID: ${response.data.patientId}`);
-    console.log(`EDD: ${response.data.edd}`);
-    console.log(`Status: ${response.data.status}`);
+    console.log(`Registration Number: ${response.data.registrationNumber || 'N/A'}`);
+    console.log(`Patient ID: ${response.data.patientId || 'N/A'}`);
+    console.log(`EDD: ${response.data.edd || 'N/A'}`);
+    console.log(`Status: ${response.data.status || 'N/A'}`);
   } else if (response.data.data && Array.isArray(response.data.data)) {
     console.log(`Results: ${response.data.data.length} records`);
   } else if (response.data.data && response.data.data.data && Array.isArray(response.data.data.data)) {
@@ -40,6 +40,21 @@ const logResponse = (testName, response) => {
     console.log('Data:', JSON.stringify(response.data, null, 2));
   }
   console.log('\n---\n');
+};
+
+// Helper function to test an API endpoint
+const testEndpoint = async (testNumber, testName, endpoint, queryParams = '') => {
+  console.log(`TEST ${testNumber}: ${testName}`);
+  try {
+    const response = await client.get(`${endpoint}${queryParams}`);
+    logResponse(testName, response);
+    return response.data;
+  } catch (error) {
+    console.log(`${testName} failed:`, error.response?.data || error.message);
+    console.log(`Status: ${error.response?.status || 'Unknown'}`);
+    console.log(`Full error:`, error);
+    return null;
+  }
 };
 
 // Test cases
@@ -51,23 +66,14 @@ async function runTests() {
   console.log(`Using existing antenatal record ID: ${antenatalId}`);
   
   try {
+    // PART 1: CORE FUNCTIONALITY TESTS
+    console.log('\n=== PART 1: CORE FUNCTIONALITY TESTS ===\n');
+    
     // Test 1: Get antenatal care record by ID
-    console.log(`TEST 1: Get antenatal care record by ID (${antenatalId})`);
-    try {
-      const singleAntenatal = await client.get(`/antenatal/${antenatalId}`);
-      logResponse('Get Antenatal by ID', singleAntenatal);
-    } catch (error) {
-      console.log('Get antenatal record failed:', error.response?.data || error.message);
-    }
+    await testEndpoint(1, `Get antenatal care record by ID (${antenatalId})`, `/antenatal/${antenatalId}`);
     
     // Test 2: Search antenatal records
-    console.log('TEST 2: Search antenatal records (Active status)');
-    try {
-      const activeAntenatal = await client.get('/antenatal?status=Active');
-      logResponse('Search Active Antenatal Records', activeAntenatal);
-    } catch (error) {
-      console.log('Search failed:', error.response?.data || error.message);
-    }
+    await testEndpoint(2, 'Search antenatal records (Active status)', '/antenatal', '?status=Active');
     
     // Test 3: Update an antenatal care record
     console.log(`TEST 3: Update antenatal care record (${antenatalId})`);
@@ -118,13 +124,7 @@ async function runTests() {
     
     // Test 5: Get visit by ID
     if (visitId) {
-      console.log(`TEST 5: Get antenatal visit by ID (${visitId})`);
-      try {
-        const singleVisit = await client.get(`/antenatal/visits/${visitId}`);
-        logResponse('Get Visit by ID', singleVisit);
-      } catch (error) {
-        console.log('Get visit failed:', error.response?.data || error.message);
-      }
+      await testEndpoint(5, `Get antenatal visit by ID (${visitId})`, `/antenatal/visits/${visitId}`);
       
       // Test 6: Update visit
       console.log(`TEST 6: Update antenatal visit (${visitId})`);
@@ -145,31 +145,52 @@ async function runTests() {
     }
     
     // Test 7: Search visits
-    console.log(`TEST 7: Search visits for antenatal record (${antenatalId})`);
-    try {
-      const visits = await client.get(`/antenatal/visits?antenatalCareId=${antenatalId}`);
-      logResponse('Search Visits', visits);
-    } catch (error) {
-      console.log('Search visits failed:', error.response?.data || error.message);
-    }
+    await testEndpoint(7, `Search visits for antenatal record (${antenatalId})`, '/antenatal/visits', `?antenatalCareId=${antenatalId}`);
     
-    // Test 8: Get antenatal statistics
-    console.log('TEST 8: Get antenatal statistics');
-    try {
-      const stats = await client.get('/antenatal/statistics?groupBy=status');
-      logResponse('Antenatal Statistics', stats);
-    } catch (error) {
-      console.log('Statistics failed:', error.response?.data || error.message);
-    }
+    // Test 8: Get due appointments
+    await testEndpoint(8, 'Get due appointments', '/antenatal/appointments/due');
     
-    // Test 9: Get due appointments
-    console.log('TEST 9: Get due appointments');
-    try {
-      const appointments = await client.get('/antenatal/appointments/due');
-      logResponse('Due Appointments', appointments);
-    } catch (error) {
-      console.log('Due appointments failed:', error.response?.data || error.message);
-    }
+    // PART 2: STATISTICS ENDPOINTS TESTS
+    console.log('\n=== PART 2: STATISTICS ENDPOINTS TESTS ===\n');
+    
+    // Common query params
+    const dateParams = `?facilityId=${FACILITY_ID}&dateFrom=2024-01-01&dateTo=2025-12-31`;
+    
+    // Test 9: Basic statistics endpoint
+    await testEndpoint(9, 'Get basic antenatal statistics', '/antenatal/statistics', '?groupBy=status');
+    
+    // Test 10: Antenatal summary statistics
+    await testEndpoint(10, 'Get antenatal summary statistics', '/antenatal/statistics/summary', dateParams);
+    
+    // Test 11: Antenatal by trimester statistics
+    await testEndpoint(11, 'Get antenatal by trimester statistics', '/antenatal/statistics/by-trimester', dateParams);
+    
+    // Test 12: Antenatal by risk level statistics
+    await testEndpoint(12, 'Get antenatal by risk level statistics', '/antenatal/statistics/by-risk', dateParams);
+    
+    // Test 13: Antenatal by age group statistics
+    await testEndpoint(13, 'Get antenatal by age group statistics', '/antenatal/statistics/by-age', dateParams);
+    
+    // Test 14: Top risk factors statistics
+    await testEndpoint(14, 'Get top risk factors statistics', '/antenatal/statistics/risk-factors', dateParams);
+    
+    // Test 15: Monthly registrations statistics
+    await testEndpoint(15, 'Get monthly registrations statistics', '/antenatal/statistics/monthly', `?facilityId=${FACILITY_ID}&year=2025`);
+    
+    // Test 16: Visit compliance statistics
+    await testEndpoint(16, 'Get visit compliance statistics', '/antenatal/statistics/compliance', dateParams);
+    
+    // Test 17: Antenatal by facility statistics
+    await testEndpoint(17, 'Get antenatal by facility statistics', '/antenatal/statistics/by-facility', '?dateFrom=2024-01-01&dateTo=2025-12-31');
+    
+    // Test 18: Delivery outcomes statistics
+    await testEndpoint(18, 'Get delivery outcomes statistics', '/antenatal/statistics/delivery-outcomes', dateParams);
+    
+    // Test 19: Antenatal trends statistics
+    await testEndpoint(19, 'Get antenatal trends statistics', '/antenatal/statistics/trends', `?facilityId=${FACILITY_ID}&months=12`);
+    
+    // Test 20: All antenatal statistics (comprehensive)
+    await testEndpoint(20, 'Get all antenatal statistics (comprehensive)', '/antenatal/statistics/all', dateParams);
     
     console.log('All antenatal API endpoint tests completed!');
     
@@ -179,4 +200,21 @@ async function runTests() {
   }
 }
 
+// Add ability to test individual endpoints for debugging
+async function testIndividualEndpoint(endpoint, queryParams = '') {
+  try {
+    console.log(`Testing individual endpoint: ${endpoint}${queryParams}`);
+    const response = await client.get(`${endpoint}${queryParams}`);
+    logResponse(`Individual test: ${endpoint}`, response);
+  } catch (error) {
+    console.log(`Test failed:`, error.response?.data || error.message);
+    console.log(`Status: ${error.response?.status || 'Unknown'}`);
+    console.log(`Full error:`, error);
+  }
+}
+
+// Uncomment and modify this line to test individual endpoints
+// testIndividualEndpoint('/antenatal/statistics/by-age', `?facilityId=${FACILITY_ID}&dateFrom=2024-01-01&dateTo=2025-12-31`);
+
+// Run all tests
 runTests();

@@ -3,12 +3,15 @@
 const express = require('express');
 const router = express.Router();
 const antenatalController = require('../controllers/antenatal.controller');
+const antenatalStatisticsController = require('../controllers/antenatal-statistics.controller');
 const { authenticate } = require('../middlewares/auth.middleware');
 const { checkPermission } = require('../middlewares/permission.middleware');
 
-// Order matters! Put specific routes before parameterized routes
+/**
+ * CORE ANTENATAL CARE ROUTES
+ */
 
-// Search route - no parameters
+// Search route
 router.get(
   '/',
   authenticate,
@@ -16,12 +19,44 @@ router.get(
   antenatalController.searchAntenatalCare
 );
 
-// Statistics route
+// Create antenatal care
+router.post(
+  '/',
+  authenticate,
+  checkPermission('antenatal:create'),
+  antenatalController.createAntenatalCare
+);
+
+// Get antenatal care by ID
 router.get(
-  '/statistics',
+  '/:id',
   authenticate,
   checkPermission('antenatal:read'),
-  antenatalController.getAntenatalStatistics
+  antenatalController.getAntenatalCareById
+);
+
+// Update antenatal care
+router.put(
+  '/:id',
+  authenticate,
+  checkPermission('antenatal:update'),
+  antenatalController.updateAntenatalCare
+);
+
+// Delete antenatal care
+router.delete(
+  '/:id',
+  authenticate,
+  checkPermission('antenatal:delete'),
+  antenatalController.deleteAntenatalCare
+);
+
+// Complete antenatal care
+router.post(
+  '/:id/complete',
+  authenticate,
+  checkPermission('antenatal:update'),
+  antenatalController.completeAntenatalCare
 );
 
 // Due appointments route
@@ -32,20 +67,16 @@ router.get(
   antenatalController.getDueAppointments
 );
 
-// Visits routes - specific
+/**
+ * ANTENATAL VISIT ROUTES
+ */
+
+// Search visits
 router.get(
   '/visits',
   authenticate,
   checkPermission('antenatal:read'),
   antenatalController.searchAntenatalVisits
-);
-
-// Visits by ID
-router.get(
-  '/visits/:id',
-  authenticate,
-  checkPermission('antenatal:read'),
-  antenatalController.getAntenatalVisitById
 );
 
 // Create visit
@@ -54,6 +85,14 @@ router.post(
   authenticate,
   checkPermission('antenatal:create'),
   antenatalController.createAntenatalVisit
+);
+
+// Get visit by ID
+router.get(
+  '/visits/:id',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalController.getAntenatalVisitById
 );
 
 // Update visit
@@ -72,44 +111,104 @@ router.delete(
   antenatalController.deleteAntenatalVisit
 );
 
-// Complete antenatal route
-router.post(
-  '/:id/complete',
-  authenticate,
-  checkPermission('antenatal:update'),
-  antenatalController.completeAntenatalCare
-);
+/**
+ * STATISTICS ROUTES
+ */
 
-// Get antenatal by ID - should be after all specific routes
+// Basic statistics
 router.get(
-  '/:id',
+  '/statistics',
   authenticate,
   checkPermission('antenatal:read'),
-  antenatalController.getAntenatalCareById
+  antenatalStatisticsController.getAntenatalStatistics
 );
 
-// Create antenatal
-router.post(
-  '/',
+// Summary statistics
+router.get(
+  '/statistics/summary',
   authenticate,
-  checkPermission('antenatal:create'),
-  antenatalController.createAntenatalCare
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getAntenatalSummary
 );
 
-// Update antenatal
-router.put(
-  '/:id',
+// Trimester statistics
+router.get(
+  '/statistics/by-trimester',
   authenticate,
-  checkPermission('antenatal:update'),
-  antenatalController.updateAntenatalCare
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getAntenatalByTrimester
 );
 
-// Delete antenatal
-router.delete(
-  '/:id',
+// Risk level statistics
+router.get(
+  '/statistics/by-risk',
   authenticate,
-  checkPermission('antenatal:delete'),
-  antenatalController.deleteAntenatalCare
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getAntenatalByRisk
+);
+
+// Age group statistics
+router.get(
+  '/statistics/by-age',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getAntenatalByAge
+);
+
+// Risk factors statistics
+router.get(
+  '/statistics/risk-factors',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getTopRiskFactors
+);
+
+// Monthly registrations
+router.get(
+  '/statistics/monthly',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getMonthlyRegistrations
+);
+
+// Visit compliance statistics
+router.get(
+  '/statistics/compliance',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getVisitCompliance
+);
+
+// Facility statistics
+router.get(
+  '/statistics/by-facility',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getAntenatalByFacility
+);
+
+// Delivery outcome statistics
+router.get(
+  '/statistics/delivery-outcomes',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getDeliveryOutcomes
+);
+
+// Trend statistics
+router.get(
+  '/statistics/trends',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getAntenatalTrends
+);
+
+// Comprehensive statistics
+router.get(
+  '/statistics/all',
+  authenticate,
+  checkPermission('antenatal:read'),
+  antenatalStatisticsController.getAllAntenatalStatistics
 );
 
 module.exports = router;
