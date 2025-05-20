@@ -21,17 +21,7 @@ const sequelize = new Sequelize(
   }
 );
 
-// Test database connection
-const testConnection = async () => {
-  try {
-    await sequelize.authenticate();
-    logger.info('Database connection has been established successfully.');
-  } catch (error) {
-    logger.error('Unable to connect to the database:', error);
-    process.exit(1);
-  }
-};
 
-testConnection();
+
 
 module.exports = sequelize;
