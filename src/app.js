@@ -9,8 +9,7 @@ const errorHandler = require('./api/middlewares/errorHandler');
 const loggerMiddleware = require('./api/middlewares/logger');
 const swaggerSetup = require('./utils/swagger');
 
-// Initialize database
-const db = require('./models');
+
 
 // Initialize Express app
 const app = express();
