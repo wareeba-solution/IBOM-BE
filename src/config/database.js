@@ -18,10 +18,14 @@ const sequelize = new Sequelize(
       acquire: 30000,
       idle: 10000,
     },
+    // Add SSL configuration for production environment
+    dialectOptions: {
+      ssl: process.env.NODE_ENV === 'production' ? {
+        require: true,
+        rejectUnauthorized: false // needed for self-signed certs
+      } : false
+    }
   }
 );
-
-
-
 
 module.exports = sequelize;
