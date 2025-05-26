@@ -8,6 +8,19 @@ const Visit = db.Visit;
 const Facility = db.Facility;
 const User = db.User;
 
+// Add this at the top of your patient.service.js file
+const formatDate = (date) => {
+  if (!date) return null;
+  
+  try {
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return null;
+    return d.toISOString().split('T')[0];
+  } catch (error) {
+    return null;
+  }
+};
+
 const calculateAge = (dateOfBirth) => {
   if (!dateOfBirth) return null;
   const birthDate = new Date(dateOfBirth);
@@ -39,8 +52,27 @@ class PatientService {
    */
   static async createPatient(patientData, userId) {
     try {
-      // Verify facility exists
-      const facility = await Facility.findByPk(patientData.facilityId);
+      // Get user with their facility association
+      const user = await User.findByPk(userId, {
+        include: [{
+          model: Facility,
+          as: 'facility'
+        }]
+      });
+  
+      if (!user) {
+        throw new Error('User not found');
+      }
+  
+      // Get facilityId from user's direct facilityId field
+      const facilityId = user.facilityId;
+  
+      if (!facilityId) {
+        throw new Error('User is not associated with any facility');
+      }
+  
+      // Verify facility exists (use the included facility or fetch it)
+      const facility = user.facility || await Facility.findByPk(facilityId);
       if (!facility) {
         throw new Error('Facility not found');
       }
@@ -50,7 +82,6 @@ class PatientService {
       const uniqueIdentifier = helpers.generatePatientId(facilityCode);
       
       // Filter the patient data to only include fields that exist in the database
-      // We use the actual Sequelize model definition to get the valid fields
       const validFields = Object.keys(Patient.rawAttributes);
       
       const filteredData = {};
@@ -60,18 +91,21 @@ class PatientService {
         }
       }
       
-      // Set default date if not provided
-      if (!filteredData.registrationDate) {
-        filteredData.registrationDate = new Date();
-      }
-
-      // Create patient
+      // Backend handles these fields - remove if sent from frontend
+      delete filteredData.facilityId; // Backend sets from user
+      delete filteredData.registrationDate; // Backend sets current date
+      delete filteredData.uniqueIdentifier; // Backend generates
+      delete filteredData.createdBy; // Backend sets from token
+  
+      // Create patient with backend-controlled values
       const patient = await Patient.create({
         ...filteredData,
         uniqueIdentifier,
-        createdBy: userId
+        facilityId: facilityId, // From user.facilityId
+        registrationDate: new Date(), // Current date
+        createdBy: userId // From JWT token
       });
-
+  
       // Get patient with facility and user info
       const createdPatient = await Patient.findByPk(patient.id, {
         include: [
@@ -86,7 +120,7 @@ class PatientService {
           },
         ],
       });
-
+  
       return createdPatient;
     } catch (error) {
       logger.error('Error creating patient:', error);

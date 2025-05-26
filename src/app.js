@@ -3,13 +3,16 @@ const morgan = require('morgan');
 const cors = require('cors');
 const helmet = require('helmet');
 const compression = require('compression');
-const rateLimit = require('express-rate-limit');
 const config = require('./config');
 const errorHandler = require('./api/middlewares/errorHandler');
 const loggerMiddleware = require('./api/middlewares/logger');
 const swaggerSetup = require('./utils/swagger');
 
-
+// ✅ Import your Redis-based rate limiters
+const {
+  generalLimiter,
+  healthLimiter
+} = require('./middleware/rateLimiter');
 
 // Initialize Express app
 const app = express();
@@ -37,24 +40,19 @@ if (process.env.NODE_ENV === 'development') {
 // Custom logger middleware
 app.use(loggerMiddleware);
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests, please try again later'
-});
-app.use('/api', limiter);
+// ✅ Apply general rate limiter to ALL API routes as a safety net
+app.use('/api', generalLimiter);
 
-// Use the combined routes from index.js
+// Health check endpoint with its own rate limiting
+app.get('/health', healthLimiter, (req, res) => {
+  res.status(200).json({ status: 'OK', message: 'Server is running' });
+});
+
+// ✅ Your existing route registration (now with individual rate limiters applied)
 app.use('/api', require('./api/routes'));
 
 // Setup Swagger after routes are configured
 swaggerSetup(app);
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).json({ status: 'OK', message: 'Server is running' });
-});
 
 // 404 handler
 app.use((req, res, next) => {
