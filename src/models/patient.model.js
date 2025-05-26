@@ -28,11 +28,11 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: false,
     },
     gender: {
-      type: DataTypes.ENUM('male', 'female', 'other'),
+      type: DataTypes.STRING,
       allowNull: false,
     },
     maritalStatus: {
-      type: DataTypes.ENUM('single', 'married', 'divorced', 'widowed', 'separated', 'other'),
+      type: DataTypes.STRING,
       allowNull: true,
     },
     occupation: {
@@ -41,8 +41,8 @@ module.exports = (sequelize, DataTypes) => {
     },
     registrationDate: {
       type: DataTypes.DATEONLY,
-      allowNull: false,
-      defaultValue: DataTypes.NOW,
+      allowNull: true,
+      
     },
     
     // Contact Details (Stage 2)
@@ -68,7 +68,7 @@ module.exports = (sequelize, DataTypes) => {
     state: {
       type: DataTypes.STRING,
       allowNull: true,
-      defaultValue: 'Akwa Ibom',
+      
     },
     postalCode: {
       type: DataTypes.STRING,
@@ -76,53 +76,25 @@ module.exports = (sequelize, DataTypes) => {
     },
     lgaOrigin: {
       type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        isIn: {
-          args: [
-            [
-              'Abak', 'Eastern Obolo', 'Eket', 'Esit Eket', 'Essien Udim',
-              'Etim Ekpo', 'Etinan', 'Ibeno', 'Ibesikpo Asutan', 'Ibiono-Ibom',
-              'Ika', 'Ikono', 'Ikot Abasi', 'Ikot Ekpene', 'Ini', 'Itu',
-              'Mbo', 'Mkpat-Enin', 'Nsit-Atai', 'Nsit-Ibom', 'Nsit-Ubium',
-              'Obot Akara', 'Okobo', 'Onna', 'Oron', 'Oruk Anam',
-              'Udung-Uko', 'Ukanafun', 'Uruan', 'Urue-Offong/Oruko', 'Uyo',
-            ]
-          ],
-          msg: 'Invalid LGA of Origin',
-        },
-      },
+      allowNull: true,
+      
     },
     lgaResidence: {
       type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        isIn: {
-          args: [
-            [
-              'Abak', 'Eastern Obolo', 'Eket', 'Esit Eket', 'Essien Udim',
-              'Etim Ekpo', 'Etinan', 'Ibeno', 'Ibesikpo Asutan', 'Ibiono-Ibom',
-              'Ika', 'Ikono', 'Ikot Abasi', 'Ikot Ekpene', 'Ini', 'Itu',
-              'Mbo', 'Mkpat-Enin', 'Nsit-Atai', 'Nsit-Ibom', 'Nsit-Ubium',
-              'Obot Akara', 'Okobo', 'Onna', 'Oron', 'Oruk Anam',
-              'Udung-Uko', 'Ukanafun', 'Uruan', 'Urue-Offong/Oruko', 'Uyo',
-            ]
-          ],
-          msg: 'Invalid LGA of Residence',
-        },
-      },
+      allowNull: true,
+      
     },
     
     // Medical Information (Stage 3)
     bloodGroup: {
-      type: DataTypes.ENUM('A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'unknown'),
+      type: DataTypes.STRING,
       allowNull: true,
-      defaultValue: 'unknown',
+      
     },
     genotype: {
-      type: DataTypes.ENUM('AA', 'AS', 'SS', 'AC', 'SC', 'CC', 'unknown'),
+      type: DataTypes.STRING,
       allowNull: true,
-      defaultValue: 'unknown',
+      
     },
     allergies: {
       type: DataTypes.TEXT,
@@ -137,9 +109,9 @@ module.exports = (sequelize, DataTypes) => {
       allowNull: true,
     },
     status: {
-      type: DataTypes.ENUM('active', 'inactive', 'deceased'),
-      allowNull: false,
-      defaultValue: 'active',
+      type: DataTypes.STRING,
+      allowNull: true,
+      
     },
     
     // Emergency Contact (Stage 4)
