@@ -6,35 +6,11 @@ const diseaseController = require('../controllers/disease.controller');
 const { authenticate } = require('../middlewares/auth.middleware');
 const { checkPermission } = require('../middlewares/permission.middleware');
 
-// Disease Registry Routes
-router.post(
-  '/registry',
-  authenticate,
-  checkPermission('diseases:create'),
-  diseaseController.createDiseaseRegistry
-);
+// =============================================================================
+// DISEASE REGISTRY ROUTES
+// =============================================================================
 
-router.get(
-  '/registry/:id',
-  authenticate,
-  checkPermission('diseases:read'),
-  diseaseController.getDiseaseRegistryById
-);
-
-router.put(
-  '/registry/:id',
-  authenticate,
-  checkPermission('diseases:update'),
-  diseaseController.updateDiseaseRegistry
-);
-
-router.delete(
-  '/registry/:id',
-  authenticate,
-  checkPermission('diseases:delete'),
-  diseaseController.deleteDiseaseRegistry
-);
-
+// Search disease registry (must come before /:id)
 router.get(
   '/registry',
   authenticate,
@@ -42,35 +18,51 @@ router.get(
   diseaseController.searchDiseaseRegistry
 );
 
-// Disease Case Routes
+// Create disease registry
 router.post(
-  '/cases',
+  '/registry',
   authenticate,
   checkPermission('diseases:create'),
-  diseaseController.createDiseaseCase
+  diseaseController.createDiseaseRegistry
 );
 
+// Get disease registry by ID
 router.get(
-  '/cases/:id',
+  '/registry/:id',
   authenticate,
   checkPermission('diseases:read'),
-  diseaseController.getDiseaseCaseById
+  diseaseController.getDiseaseRegistryById
 );
 
+// Update disease registry
 router.put(
-  '/cases/:id',
+  '/registry/:id',
   authenticate,
   checkPermission('diseases:update'),
-  diseaseController.updateDiseaseCase
+  diseaseController.updateDiseaseRegistry
 );
 
+// Delete disease registry
 router.delete(
-  '/cases/:id',
+  '/registry/:id',
   authenticate,
   checkPermission('diseases:delete'),
-  diseaseController.deleteDiseaseCase
+  diseaseController.deleteDiseaseRegistry
 );
 
+// =============================================================================
+// DISEASE CASE ROUTES
+// =============================================================================
+
+// Export disease case data (must come before /:id)
+router.get(
+  '/cases/export',
+  authenticate,
+  checkPermission('diseases:export'),
+  diseaseController.exportDiseaseCases
+);
+
+// Search disease cases (must come before /:id)
 router.get(
   '/cases',
   authenticate,
@@ -78,6 +70,39 @@ router.get(
   diseaseController.searchDiseaseCases
 );
 
+// Create disease case
+router.post(
+  '/cases',
+  authenticate,
+  checkPermission('diseases:create'),
+  diseaseController.createDiseaseCase
+);
+
+// Get disease case by ID
+router.get(
+  '/cases/:id',
+  authenticate,
+  checkPermission('diseases:read'),
+  diseaseController.getDiseaseCaseById
+);
+
+// Update disease case
+router.put(
+  '/cases/:id',
+  authenticate,
+  checkPermission('diseases:update'),
+  diseaseController.updateDiseaseCase
+);
+
+// Delete disease case
+router.delete(
+  '/cases/:id',
+  authenticate,
+  checkPermission('diseases:delete'),
+  diseaseController.deleteDiseaseCase
+);
+
+// Report disease to authorities
 router.post(
   '/cases/:id/report',
   authenticate,
@@ -85,42 +110,11 @@ router.post(
   diseaseController.reportDiseaseToAuthorities
 );
 
-// Contact Tracing Routes
-router.post(
-  '/contacts',
-  authenticate,
-  checkPermission('diseases:create'),
-  diseaseController.createContactTracing
-);
+// =============================================================================
+// CONTACT TRACING ROUTES
+// =============================================================================
 
-router.get(
-  '/contacts/:id',
-  authenticate,
-  checkPermission('diseases:read'),
-  diseaseController.getContactTracingById
-);
-
-router.put(
-  '/contacts/:id',
-  authenticate,
-  checkPermission('diseases:update'),
-  diseaseController.updateContactTracing
-);
-
-router.delete(
-  '/contacts/:id',
-  authenticate,
-  checkPermission('diseases:delete'),
-  diseaseController.deleteContactTracing
-);
-
-router.get(
-  '/contacts',
-  authenticate,
-  checkPermission('diseases:read'),
-  diseaseController.searchContactTracing
-);
-
+// Batch update contacts (must come before /:id)
 router.post(
   '/contacts/batch-update',
   authenticate,
@@ -128,19 +122,72 @@ router.post(
   diseaseController.updateContactBatch
 );
 
-// Statistics and Reports
-router.get(
-  '/statistics',
-  authenticate,
-  checkPermission('diseases:read'),
-  diseaseController.getDiseaseStatistics
-);
-
+// Get contacts needing follow-up (must come before /:id)
 router.get(
   '/contacts/follow-up',
   authenticate,
   checkPermission('diseases:read'),
   diseaseController.getContactsNeedingFollowUp
+);
+
+// Search contact tracing (must come before /:id)
+router.get(
+  '/contacts',
+  authenticate,
+  checkPermission('diseases:read'),
+  diseaseController.searchContactTracing
+);
+
+// Create contact tracing
+router.post(
+  '/contacts',
+  authenticate,
+  checkPermission('diseases:create'),
+  diseaseController.createContactTracing
+);
+
+// Get contact tracing by ID
+router.get(
+  '/contacts/:id',
+  authenticate,
+  checkPermission('diseases:read'),
+  diseaseController.getContactTracingById
+);
+
+// Update contact tracing
+router.put(
+  '/contacts/:id',
+  authenticate,
+  checkPermission('diseases:update'),
+  diseaseController.updateContactTracing
+);
+
+// Delete contact tracing
+router.delete(
+  '/contacts/:id',
+  authenticate,
+  checkPermission('diseases:delete'),
+  diseaseController.deleteContactTracing
+);
+
+// =============================================================================
+// STATISTICS AND REPORTING ROUTES
+// =============================================================================
+
+// Get disease trends over time (must come before /statistics with params)
+router.get(
+  '/statistics/trends',
+  authenticate,
+  checkPermission('diseases:read'),
+  diseaseController.getDiseaseTrends
+);
+
+// Get disease statistics
+router.get(
+  '/statistics',
+  authenticate,
+  checkPermission('diseases:read'),
+  diseaseController.getDiseaseStatistics
 );
 
 module.exports = router;
