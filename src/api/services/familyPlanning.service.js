@@ -223,7 +223,7 @@ class FamilyPlanningService {
         {
           model: db.Facility,
           as: 'facility',
-          attributes: ['id', 'name', 'type', 'lga'],
+          attributes: ['id', 'name', 'facilityType', 'lga'],
         },
       ];
 
@@ -361,7 +361,7 @@ class FamilyPlanningService {
           {
             model: db.Facility,
             as: 'facility',
-            attributes: ['id', 'name', 'type', 'lga'],
+            attributes: ['id', 'name', 'facilityType', 'lga'],
           },
         ],
         order: [[sortBy, sortOrder]],
@@ -886,7 +886,7 @@ class FamilyPlanningService {
             fs.id as "familyPlanningServiceId",
             fs."clientId",
             ROW_NUMBER() OVER (PARTITION BY fs."clientId" ORDER BY fs."serviceDate" DESC) as rn
-          FROM family_planning_services fs
+          FROM "FamilyPlanningServices" fs
           WHERE fs."nextAppointment" IS NOT NULL
         ) ranked WHERE rn = 1)
       `);
@@ -912,7 +912,7 @@ class FamilyPlanningService {
               {
                 model: db.Facility,
                 as: 'facility',
-                attributes: ['id', 'name', 'type', 'lga'],
+                attributes: ['id', 'name', 'facilityType', 'lga'],
               },
             ],
           },
@@ -950,8 +950,8 @@ class FamilyPlanningService {
           SELECT DISTINCT ON (fs."clientId") 
             fs."methodId",
             fs."clientId"
-          FROM family_planning_services fs
-          JOIN family_planning_clients fc ON fs."clientId" = fc.id
+          FROM "FamilyPlanningServices" fs
+          JOIN "FamilyPlanningClients" fc ON fs."clientId" = fc.id
           WHERE fc.status = 'Active'
           ORDER BY fs."clientId", fs."serviceDate" DESC
         )
@@ -960,7 +960,7 @@ class FamilyPlanningService {
           m.category AS "methodCategory",
           COUNT(lm."clientId") AS "count"
         FROM LatestMethods lm
-        JOIN family_planning_methods m ON lm."methodId" = m.id
+        JOIN "FamilyPlanningMethods" m ON lm."methodId" = m.id
         GROUP BY m.name, m.category
         ORDER BY "count" DESC
       `;
@@ -988,35 +988,35 @@ class FamilyPlanningService {
             `AND EXTRACT(YEAR FROM fc."registrationDate") <= ${yearTo}` : 
             '';
 
-      const query = `
-        WITH RegisteredClients AS (
-          SELECT 
-            EXTRACT(YEAR FROM fc."registrationDate") AS year,
-            COUNT(fc.id) AS total_registered
-          FROM family_planning_clients fc
-          ${whereClause}
-          ${yearFilter}
-          GROUP BY EXTRACT(YEAR FROM fc."registrationDate")
-        ),
-        ActiveClients AS (
-          SELECT 
-            EXTRACT(YEAR FROM fc."registrationDate") AS year,
-            COUNT(fc.id) AS still_active
-          FROM family_planning_clients fc
-          ${whereClause}
-          ${yearFilter}
-          WHERE fc.status = 'Active'
-          GROUP BY EXTRACT(YEAR FROM fc."registrationDate")
-        )
-        SELECT 
-          rc.year,
-          rc.total_registered,
-          COALESCE(ac.still_active, 0) AS still_active,
-          ROUND((COALESCE(ac.still_active, 0)::float / rc.total_registered::float) * 100, 2) AS retention_rate
-        FROM RegisteredClients rc
-        LEFT JOIN ActiveClients ac ON rc.year = ac.year
-        ORDER BY rc.year
-      `;
+            const query = `
+              WITH RegisteredClients AS (
+                SELECT 
+                  EXTRACT(YEAR FROM fc."registrationDate") AS year,
+                  COUNT(fc.id) AS total_registered
+                FROM "FamilyPlanningClients" fc
+                ${whereClause}
+                ${yearFilter}
+                GROUP BY EXTRACT(YEAR FROM fc."registrationDate")
+              ),
+              ActiveClients AS (
+                SELECT 
+                  EXTRACT(YEAR FROM fc."registrationDate") AS year,
+                  COUNT(fc.id) AS still_active
+                FROM "FamilyPlanningClients" fc
+                ${whereClause}
+                ${yearFilter}
+                WHERE fc.status = 'Active'
+                GROUP BY EXTRACT(YEAR FROM fc."registrationDate")
+              )
+              SELECT 
+                rc.year,
+                rc.total_registered,
+                COALESCE(ac.still_active, 0) AS still_active,
+                ROUND((COALESCE(ac.still_active, 0)::float / rc.total_registered::float) * 100, 2) AS retention_rate
+              FROM RegisteredClients rc
+              LEFT JOIN ActiveClients ac ON rc.year = ac.year
+              ORDER BY rc.year
+            `;
 
       const results = await db.sequelize.query(query, { 
         type: db.sequelize.QueryTypes.SELECT 
