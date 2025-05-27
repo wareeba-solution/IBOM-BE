@@ -318,6 +318,41 @@ class DiseaseController {
       next(error);
     }
   }
+
+  async exportDiseaseCases(req, res, next) {
+    try {
+      const { format, dateFrom, dateTo, diseaseId, facilityId } = req.query;
+      
+      const results = await diseaseService.exportDiseaseCases({
+        format: format || 'csv',
+        dateFrom,
+        dateTo,
+        diseaseId,
+        facilityId
+      });
+      
+      return res.status(200).json(results);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getDiseaseTrends(req, res, next) {
+    try {
+      const { facilityId, period, diseaseId, months } = req.query;
+      
+      const results = await diseaseService.getDiseaseTrends({
+        facilityId,
+        period: period || 'month',
+        diseaseId,
+        months: months ? parseInt(months, 10) : 12
+      });
+      
+      return res.status(200).json(results);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = new DiseaseController();

@@ -48,11 +48,22 @@ const searchDiseaseRegistrySchema = Joi.object({
 
 // DiseaseCase validation schemas
 const diagnosisTypes = ['Clinical', 'Laboratory', 'Epidemiological', 'Presumptive'];
-const severityLevels = ['Mild', 'Moderate', 'Severe', 'Critical'];
-const outcomeOptions = ['Recovered', 'Recovering', 'Deceased', 'Unknown', 'Lost to Follow-up'];
-const statusOptions = ['Active', 'Resolved', 'Deceased', 'Lost to Follow-up'];
+const severityLevels = ['mild', 'moderate', 'severe'];
+const outcomeOptions = ['under_treatment', 'recovered', 'hospitalized', 'death'];
+const caseStatusOptions = ['Active', 'Resolved', 'Deceased', 'Lost to Follow-up']; // Add this if you use caseStatus
+
+const statusOptions = ['suspected', 'probable', 'confirmed', 'ruled_out'];
 
 const createDiseaseCaseSchema = Joi.object({
+
+  caseId: Joi.string().required().messages({
+    'string.empty': 'Case ID cannot be empty',
+    'any.required': 'Case ID is required',
+  }),
+  diseaseType: Joi.string().required().messages({
+    'string.empty': 'Disease type cannot be empty',
+    'any.required': 'Disease type is required',
+  }),
   diseaseId: Joi.string().uuid().required().messages({
     'string.uuid': 'Disease ID must be a valid UUID',
     'any.required': 'Disease ID is required',
@@ -65,8 +76,8 @@ const createDiseaseCaseSchema = Joi.object({
     'string.uuid': 'Facility ID must be a valid UUID',
     'any.required': 'Facility ID is required',
   }),
-  reportingDate: Joi.date().iso().required().messages({
-    'date.base': 'Reporting date must be a valid date',
+  reportDate: Joi.date().iso().required().messages({
+    'date.base': 'Report date must be a valid date',
     'any.required': 'Reporting date is required',
   }),
   onsetDate: Joi.date().iso().allow(null).messages({
@@ -94,7 +105,7 @@ const createDiseaseCaseSchema = Joi.object({
     'date.base': 'Discharge date must be a valid date',
     'date.min': 'Discharge date must be after hospitalization date',
   }),
-  outcome: Joi.string().valid(...outcomeOptions).default('Unknown'),
+  outcome: Joi.string().valid(...outcomeOptions).default('under_treatment'),
   outcomeDate: Joi.date().iso().allow(null).messages({
     'date.base': 'Outcome date must be a valid date',
   }),
@@ -166,12 +177,12 @@ const searchDiseaseCaseSchema = Joi.object({
   facilityId: Joi.string().uuid().messages({
     'string.uuid': 'Facility ID must be a valid UUID',
   }),
-  reportingDateFrom: Joi.date().iso().messages({
-    'date.base': 'Reporting from date must be a valid date',
+  reportDateFrom: Joi.date().iso().messages({
+    'date.base': 'Report from date must be a valid date',
   }),
-  reportingDateTo: Joi.date().iso().min(Joi.ref('reportingDateFrom')).messages({
-    'date.base': 'Reporting to date must be a valid date',
-    'date.min': 'Reporting to date must be greater than or equal to from date',
+  reportDateTo: Joi.date().iso().min(Joi.ref('reportingDateFrom')).messages({
+    'date.base': 'Report to date must be a valid date',
+    'date.min': 'Report to date must be greater than or equal to from date',
   }),
   diagnosisType: Joi.string().valid(...diagnosisTypes),
   severity: Joi.string().valid(...severityLevels),
@@ -181,7 +192,7 @@ const searchDiseaseCaseSchema = Joi.object({
   reportedToAuthorities: Joi.boolean(),
   page: Joi.number().integer().min(1).default(1),
   limit: Joi.number().integer().min(1).max(100).default(10),
-  sortBy: Joi.string().valid('reportingDate', 'diagnosisDate', 'createdAt').default('reportingDate'),
+  sortBy: Joi.string().valid('reportDate', 'diagnosisDate', 'createdAt').default('reportDate'),
   sortOrder: Joi.string().valid('asc', 'desc').default('desc'),
 });
 
