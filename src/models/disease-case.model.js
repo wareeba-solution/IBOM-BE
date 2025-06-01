@@ -1,3 +1,5 @@
+// disease-case.model.js
+
 'use strict';
 
 module.exports = (sequelize, DataTypes) => {

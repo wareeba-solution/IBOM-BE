@@ -51,7 +51,7 @@ module.exports = (sequelize) => {
   });
 
   Report.associate = (models) => {
-    Report.belongsTo(models.User, { foreignKey: 'createdBy', as: 'creator' });
+    Report.belongsTo(models.User, { foreignKey: 'createdBy', as: 'creator', onDelete: 'SET NULL',onUpdate: 'CASCADE' });
   };
 
   return Report;
