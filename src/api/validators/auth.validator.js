@@ -1,3 +1,5 @@
+// auth.validator.js
+
 const yup = require('yup');
 
 // Registration validation schema
@@ -62,10 +64,24 @@ const updatePasswordSchema = yup.object().shape({
     .min(6, 'New password must be at least 6 characters'),
 });
 
+// Refresh token validation schema
+const refreshTokenSchema = yup.object().shape({
+  refreshToken: yup.string()
+    .required('Refresh token is required')
+});
+
+// Logout validation schema (optional)
+const logoutSchema = yup.object().shape({
+  refreshToken: yup.string()
+    .required('Refresh token is required')
+});
+
 module.exports = {
   registerSchema,
   loginSchema,
   resetRequestSchema,
   resetPasswordSchema,
   updatePasswordSchema,
+  refreshTokenSchema,
+  logoutSchema
 };
