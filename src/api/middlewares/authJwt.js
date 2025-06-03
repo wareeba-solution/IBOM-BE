@@ -2,44 +2,50 @@ const jwt = require('jsonwebtoken');
 const config = require('../../config');
 const db = require('../../models');
 const ApiResponse = require('../../utils/apiResponse');
+const logger = require('../../utils/logger');
 
 const User = db.User;
 const Role = db.Role;
+const Facility = db.Facility;
 
 /**
- * Verify JWT token
+ * Verify JWT token with enhanced error handling for token expiration
  */
 const verifyToken = async (req, res, next) => {
   const authHeader = req.headers.authorization;
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    console.log('No token provided or incorrect format:', authHeader);
+    logger.debug('No token provided or incorrect format:', authHeader);
     return ApiResponse.unauthorized(res, 'No token provided');
   }
   
   const token = authHeader.split(' ')[1];
   
   try {
-    console.log('Verifying token...');
+    logger.debug('Verifying token...');
     const decoded = jwt.verify(token, config.jwt.secret);
-    console.log('Token decoded successfully:', decoded);
+    logger.debug('Token decoded successfully');
     
-    // Find user with the decoded ID
+    // Find user with the decoded ID including role and facility
     const user = await User.findByPk(decoded.id, {
       include: [
         {
           model: Role,
           as: 'role',
         },
+        {
+          model: Facility,
+          as: 'facility',
+        }
       ],
     });
     
     if (!user) {
-      console.log('User not found for decoded ID:', decoded.id);
+      logger.error('User not found for decoded ID:', decoded.id);
       return ApiResponse.unauthorized(res, 'Invalid token - user not found');
     }
     
-    console.log('User found:', {
+    logger.debug('User authenticated:', {
       id: user.id,
       username: user.username,
       status: user.status,
@@ -48,21 +54,88 @@ const verifyToken = async (req, res, next) => {
     
     // Check if user is active
     if (user.status !== 'active') {
-      console.log('User account is not active:', user.status);
+      logger.debug('User account is not active:', user.status);
       return ApiResponse.forbidden(res, 'Account is not active');
     }
     
     // Add user to request
     req.user = user;
+    
+    // Update last activity timestamp if needed
+    try {
+      await User.update(
+        { lastActivity: new Date() },
+        { where: { id: user.id }, silent: true }
+      );
+    } catch (updateError) {
+      // Non-critical error, just log it
+      logger.warn('Failed to update user last activity:', updateError.message);
+    }
+    
     next();
   } catch (error) {
-    console.error('Token verification error:', error);
+    logger.error('Token verification error:', error.name);
     
     if (error.name === 'TokenExpiredError') {
-      return ApiResponse.unauthorized(res, 'Token expired');
+      // Include expired flag to help frontend identify when to refresh token
+      return ApiResponse.unauthorized(res, 'Token expired', { expired: true });
     }
     
     return ApiResponse.unauthorized(res, 'Invalid token');
+  }
+};
+
+/**
+ * Verify token without throwing errors - useful for optional authentication
+ */
+const optionalAuth = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // Continue without authentication
+    next();
+    return;
+  }
+  
+  const token = authHeader.split(' ')[1];
+  
+  try {
+    const decoded = jwt.verify(token, config.jwt.secret);
+    
+    // Find user with the decoded ID
+    const user = await User.findByPk(decoded.id, {
+      include: [
+        {
+          model: Role,
+          as: 'role',
+        },
+        {
+          model: Facility,
+          as: 'facility',
+        }
+      ],
+    });
+    
+    if (user && user.status === 'active') {
+      // Add user to request
+      req.user = user;
+      
+      // Update last activity timestamp
+      try {
+        await User.update(
+          { lastActivity: new Date() },
+          { where: { id: user.id }, silent: true }
+        );
+      } catch (updateError) {
+        // Just log the error
+        logger.warn('Failed to update user last activity:', updateError.message);
+      }
+    }
+    
+    next();
+  } catch (error) {
+    // Just continue without authentication on any error
+    next();
   }
 };
 
@@ -97,12 +170,22 @@ const hasRole = (roleName) => {
       return ApiResponse.unauthorized(res, 'No user found');
     }
     
-    if (req.user.role.name === roleName || req.user.role.name === 'admin') {
+    // Convert to array for easier comparison if single role name provided
+    const requiredRoles = Array.isArray(roleName) ? roleName : [roleName];
+    
+    // Admin always has access
+    if (req.user.role.name.toLowerCase() === 'admin') {
       next();
       return;
     }
     
-    return ApiResponse.forbidden(res, `Requires ${roleName} role`);
+    // Check if user's role is in the required roles list
+    if (requiredRoles.some(role => req.user.role.name.toLowerCase() === role.toLowerCase())) {
+      next();
+      return;
+    }
+    
+    return ApiResponse.forbidden(res, `Requires ${requiredRoles.join(' or ')} role`);
   };
 };
 
@@ -117,7 +200,8 @@ const hasFacilityAccess = (req, res, next) => {
   }
   
   // Admin and health commissioner can access all facilities
-  if (req.user.role.name === 'admin' || req.user.role.name === 'health_commissioner') {
+  if (req.user.role.name.toLowerCase() === 'admin' || 
+      req.user.role.name.toLowerCase() === 'health_commissioner') {
     next();
     return;
   }
@@ -133,6 +217,7 @@ const hasFacilityAccess = (req, res, next) => {
 
 module.exports = {
   verifyToken,
+  optionalAuth,
   isAdmin,
   hasRole,
   hasFacilityAccess,

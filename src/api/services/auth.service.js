@@ -6,6 +6,28 @@ const db = require('../../models');
 const User = db.User;
 const Role = db.Role;
 const Facility = db.Facility;
+const RefreshToken = db.RefreshToken || db.sequelize.define('RefreshToken', {
+  token: {
+    type: db.Sequelize.STRING,
+    allowNull: false,
+    unique: true
+  },
+  userId: {
+    type: db.Sequelize.INTEGER,
+    allowNull: false,
+    references: {
+      model: 'Users',
+      key: 'id'
+    }
+  },
+  expiresAt: {
+    type: db.Sequelize.DATE,
+    allowNull: false
+  }
+}, {
+  tableName: 'RefreshTokens'
+});
+
 
 /**
  * Authentication service
@@ -139,7 +161,8 @@ class AuthService {
       await user.update({ lastLogin: new Date() });
 
       // Generate token
-      const token = this.generateToken(user);
+      const accessToken = this.generateToken(user);
+      const refreshToken = await this.generateRefreshToken(user.id);
 
       // Return user and token
       return {
@@ -154,7 +177,8 @@ class AuthService {
           facilityId: user.facilityId,
           status: user.status,
         },
-        token,
+        accessToken,
+        refreshToken,
       };
     } catch (error) {
       throw error;
@@ -174,7 +198,7 @@ class AuthService {
     };
 
     return jwt.sign(payload, config.jwt.secret, {
-      expiresIn: '48h',
+      expiresIn: '24h',
     });
   }
 
@@ -278,6 +302,118 @@ class AuthService {
       throw error;
     }
   }
+
+
+
+  /**
+   * Generate refresh token
+   * @param {Number} userId - User ID
+   * @returns {String} Refresh token
+   */
+  static async generateRefreshToken(userId) {
+    try {
+      // Remove any existing refresh tokens for this user
+      await RefreshToken.destroy({ where: { userId } });
+      
+      // Generate new refresh token
+      const refreshToken = crypto.randomBytes(40).toString('hex');
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30); // 30 days expiry for refresh token
+      
+      // Save refresh token to database
+      await RefreshToken.create({
+        token: refreshToken,
+        userId,
+        expiresAt
+      });
+      
+      return refreshToken;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Refresh access token using refresh token
+   * @param {String} refreshToken - Refresh token
+   * @returns {Object} New access token and user info
+   */
+  static async refreshToken(refreshToken) {
+    try {
+      // Find refresh token in database
+      const foundToken = await RefreshToken.findOne({
+        where: {
+          token: refreshToken,
+          expiresAt: { [db.Sequelize.Op.gt]: new Date() }
+        }
+      });
+      
+      if (!foundToken) {
+        throw new Error('Invalid or expired refresh token');
+      }
+      
+      // Get user
+      const user = await User.findByPk(foundToken.userId, {
+        include: [
+          {
+            model: Role,
+            as: 'role',
+          },
+          {
+            model: Facility,
+            as: 'facility',
+          },
+        ],
+      });
+      
+      if (!user || user.status !== 'active') {
+        throw new Error('User not found or inactive');
+      }
+      
+      // Generate new access token
+      const accessToken = this.generateToken(user);
+      
+      // Return new access token and user info
+      return {
+        user: {
+          id: user.id,
+          username: user.username,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          role: user.role ? user.role.name : null,
+          facility: user.facility ? user.facility.name : null,
+          facilityId: user.facilityId,
+          status: user.status,
+        },
+        accessToken
+      };
+    } catch (error) {
+      throw error;
+    }
+  }
+
+  /**
+   * Logout user - invalidate refresh token
+   * @param {String} refreshToken - Refresh token to invalidate
+   * @returns {Boolean} Success status
+   */
+  static async logout(refreshToken) {
+    try {
+      if (!refreshToken) return true;
+      
+      // Delete refresh token from database
+      await RefreshToken.destroy({
+        where: { token: refreshToken }
+      });
+      
+      return true;
+    } catch (error) {
+      throw error;
+    }
+  }
+
+
 }
 
 module.exports = AuthService;

@@ -1,14 +1,13 @@
-/**
- * Authentication middleware for handling user authentication and authorization
- */
-
+// auth.middleware.js - Enhanced with better token validation
 const jwt = require('jsonwebtoken');
 const db = require('../../models');
 const config = require('../../config');
 const ApiResponse = require('../../utils/apiResponse');
+const logger = require('../../utils/logger');
 
 const User = db.User;
 const Role = db.Role;
+const Facility = db.Facility;
 
 /**
  * Authenticate middleware - verifies JWT token and sets req.user
@@ -22,6 +21,7 @@ exports.authenticate = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      logger.debug('No token provided or incorrect format');
       return ApiResponse.unauthorized(res, 'No token provided');
     }
     
@@ -31,30 +31,39 @@ exports.authenticate = async (req, res, next) => {
     let decoded;
     try {
       decoded = jwt.verify(token, config.jwt.secret);
+      logger.debug('Token verified successfully');
     } catch (error) {
+      logger.error('Token verification error:', error);
+      
       if (error.name === 'TokenExpiredError') {
-        return ApiResponse.unauthorized(res, 'Token expired');
+        return ApiResponse.unauthorized(res, 'Token expired', { expired: true });
       }
       return ApiResponse.unauthorized(res, 'Invalid token');
     }
     
-    // Get user from database
+    // Get user from database with facility information
     const user = await User.findByPk(decoded.id, {
       include: [
         {
           model: Role,
           as: 'role',
         },
+        {
+          model: Facility,
+          as: 'facility',
+        },
       ],
       attributes: { exclude: ['password', 'resetToken', 'resetTokenExpiry'] },
     });
     
     if (!user) {
+      logger.error('User not found for token:', decoded);
       return ApiResponse.unauthorized(res, 'User not found');
     }
     
     // Check if user is active
     if (user.status !== 'active') {
+      logger.debug('Inactive user attempted access:', user.id);
       return ApiResponse.forbidden(res, 'Account is not active');
     }
     
@@ -69,9 +78,12 @@ exports.authenticate = async (req, res, next) => {
     
     next();
   } catch (error) {
+    logger.error('Authentication middleware error:', error);
     return ApiResponse.serverError(res, error.message);
   }
 };
+
+// ... Keep other middleware functions ...
 
 /**
  * Check if user has admin role

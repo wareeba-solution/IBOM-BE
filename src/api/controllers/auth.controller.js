@@ -134,6 +134,73 @@ class AuthController {
       return ApiResponse.serverError(res, error.message);
     }
   }
+
+
+
+  /**
+   * Refresh access token
+   * @param {Object} req - Request object
+   * @param {Object} res - Response object
+   * @returns {Object} Response
+   */
+  static async refreshToken(req, res) {
+    try {
+      const { refreshToken } = req.body;
+      
+      if (!refreshToken) {
+        return ApiResponse.badRequest(res, 'Refresh token is required');
+      }
+      
+      const result = await AuthService.refreshToken(refreshToken);
+      return ApiResponse.success(res, 'Token refreshed successfully', result);
+    } catch (error) {
+      logger.error('Token refresh error:', error);
+      return ApiResponse.unauthorized(res, error.message);
+    }
+  }
+
+  /**
+   * Logout user
+   * @param {Object} req - Request object
+   * @param {Object} res - Response object
+   * @returns {Object} Response
+   */
+  static async logout(req, res) {
+    try {
+      const { refreshToken } = req.body;
+      await AuthService.logout(refreshToken);
+      return ApiResponse.success(res, 'Logout successful');
+    } catch (error) {
+      logger.error('Logout error:', error);
+      return ApiResponse.error(res, error.message);
+    }
+  }
+
+  /**
+   * Validate token
+   * @param {Object} req - Request object
+   * @param {Object} res - Response object
+   * @returns {Object} Response
+   */
+  static async validateToken(req, res) {
+    // If we got here, the token is valid (checked by auth middleware)
+    return ApiResponse.success(res, 'Token is valid', {
+      user: {
+        id: req.user.id,
+        username: req.user.username,
+        email: req.user.email,
+        firstName: req.user.firstName,
+        lastName: req.user.lastName,
+        role: req.user.role ? req.user.role.name : null,
+        facility: req.user.facility ? {
+          id: req.user.facility.id,
+          name: req.user.facility.name,
+        } : null,
+        status: req.user.status,
+      }
+    });
+  }
+
 }
 
 module.exports = AuthController;

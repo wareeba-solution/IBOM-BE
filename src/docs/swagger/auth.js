@@ -48,7 +48,7 @@
  *                 data:
  *                   type: object
  *                   properties:
- *                     token:
+ *                     accessToken:
  *                       type: string
  *                       description: JWT access token
  *                     refreshToken:
@@ -130,9 +130,9 @@
  *       422:
  *         description: Validation error
  * 
- * /auth/refresh:
+ * /auth/refresh-token:
  *   post:
- *     summary: Refresh auth token
+ *     summary: Refresh access token
  *     description: Get a new access token using a refresh token
  *     tags: [Auth]
  *     security: []
@@ -147,7 +147,7 @@
  *             properties:
  *               refreshToken:
  *                 type: string
- *                 description: Refresh token
+ *                 description: Refresh token obtained during login
  *     responses:
  *       200:
  *         description: Token refreshed successfully
@@ -159,25 +159,43 @@
  *                 status:
  *                   type: string
  *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: Token refreshed successfully
  *                 data:
  *                   type: object
  *                   properties:
- *                     token:
+ *                     accessToken:
  *                       type: string
  *                       description: New JWT access token
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *       400:
+ *         description: Refresh token is required
  *       401:
  *         description: Invalid or expired refresh token
  * 
  * /auth/logout:
  *   post:
  *     summary: Logout
- *     description: Invalidate the current session
+ *     description: Invalidate the current refresh token
  *     tags: [Auth]
- *     security:
- *       - BearerAuth: []
+ *     security: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - refreshToken
+ *             properties:
+ *               refreshToken:
+ *                 type: string
+ *                 description: Refresh token to invalidate
  *     responses:
  *       200:
- *         description: Logged out successfully
+ *         description: Logout successful
  *         content:
  *           application/json:
  *             schema:
@@ -188,9 +206,38 @@
  *                   example: success
  *                 message:
  *                   type: string
- *                   example: Logged out successfully
+ *                   example: Logout successful
  *       401:
  *         description: Unauthorized
+ * 
+ * /auth/validate:
+ *   get:
+ *     summary: Validate token
+ *     description: Check if the current access token is valid
+ *     tags: [Auth]
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Token is valid
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: Token is valid
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     user:
+ *                       $ref: '#/components/schemas/User'
+ *       401:
+ *         description: Invalid or expired token
  * 
  * /auth/forgot-password:
  *   post:
@@ -224,7 +271,7 @@
  *                   example: success
  *                 message:
  *                   type: string
- *                   example: Password reset link sent to your email
+ *                   example: Password reset instructions sent to your email
  *       404:
  *         description: User not found
  *       422:
@@ -271,28 +318,40 @@
  *                   example: success
  *                 message:
  *                   type: string
- *                   example: Password reset successful. You can now log in with your new password.
+ *                   example: Password reset successful
  *       400:
  *         description: Invalid or expired token
  *       422:
  *         description: Validation error
  * 
- * /auth/verify-email:
- *   get:
- *     summary: Verify email
- *     description: Verify user's email address using a token
+ * /auth/update-password:
+ *   post:
+ *     summary: Update password
+ *     description: Change the current user's password
  *     tags: [Auth]
- *     security: []
- *     parameters:
- *       - in: query
- *         name: token
- *         required: true
- *         schema:
- *           type: string
- *         description: Email verification token
+ *     security:
+ *       - BearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - currentPassword
+ *               - newPassword
+ *             properties:
+ *               currentPassword:
+ *                 type: string
+ *                 format: password
+ *                 description: Current password
+ *               newPassword:
+ *                 type: string
+ *                 format: password
+ *                 description: New password
  *     responses:
  *       200:
- *         description: Email verified successfully
+ *         description: Password updated successfully
  *         content:
  *           application/json:
  *             schema:
@@ -303,9 +362,13 @@
  *                   example: success
  *                 message:
  *                   type: string
- *                   example: Email verified successfully. You can now log in.
+ *                   example: Password updated successfully
  *       400:
- *         description: Invalid or expired token
+ *         description: Current password is incorrect
+ *       401:
+ *         description: Unauthorized
+ *       422:
+ *         description: Validation error
  * 
  * /auth/me:
  *   get:
@@ -325,44 +388,24 @@
  *                 status:
  *                   type: string
  *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: User profile retrieved successfully
  *                 data:
  *                   $ref: '#/components/schemas/User'
  *       401:
  *         description: Unauthorized
- * 
- * /auth/change-password:
- *   post:
- *     summary: Change password
- *     description: Change the current user's password
+ *
+ * /auth/profile:
+ *   get:
+ *     summary: Get user profile (alias for /me)
+ *     description: Get the current user's profile
  *     tags: [Auth]
  *     security:
  *       - BearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - currentPassword
- *               - newPassword
- *               - confirmPassword
- *             properties:
- *               currentPassword:
- *                 type: string
- *                 format: password
- *                 description: Current password
- *               newPassword:
- *                 type: string
- *                 format: password
- *                 description: New password
- *               confirmPassword:
- *                 type: string
- *                 format: password
- *                 description: Confirm new password
  *     responses:
  *       200:
- *         description: Password changed successfully
+ *         description: User profile retrieved successfully
  *         content:
  *           application/json:
  *             schema:
@@ -373,11 +416,58 @@
  *                   example: success
  *                 message:
  *                   type: string
- *                   example: Password changed successfully
- *       400:
- *         description: Current password is incorrect
+ *                   example: User profile retrieved successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/User'
  *       401:
  *         description: Unauthorized
- *       422:
- *         description: Validation error
+ * 
+ * components:
+ *   schemas:
+ *     User:
+ *       type: object
+ *       properties:
+ *         id:
+ *           type: string
+ *           format: uuid
+ *           description: User ID
+ *         username:
+ *           type: string
+ *           description: Username
+ *         email:
+ *           type: string
+ *           format: email
+ *           description: Email address
+ *         firstName:
+ *           type: string
+ *           description: First name
+ *         lastName:
+ *           type: string
+ *           description: Last name
+ *         role:
+ *           type: string
+ *           description: User role
+ *         facility:
+ *           type: object
+ *           properties:
+ *             id:
+ *               type: string
+ *               format: uuid
+ *               description: Facility ID
+ *             name:
+ *               type: string
+ *               description: Facility name
+ *         status:
+ *           type: string
+ *           enum: [active, inactive, pending]
+ *           description: User status
+ *         lastLogin:
+ *           type: string
+ *           format: date-time
+ *           description: Last login timestamp
+ *   securitySchemes:
+ *     BearerAuth:
+ *       type: http
+ *       scheme: bearer
+ *       bearerFormat: JWT
  */
