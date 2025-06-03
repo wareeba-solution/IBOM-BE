@@ -57,7 +57,7 @@
         "yup": "^1.6.1"
     },
     "devDependencies": {
-        "eslint": "^8.52.0",
+        "eslint": "^9.28.0",
         "eslint-config-prettier": "^9.0.0",
         "eslint-plugin-node": "^11.1.0",
         "eslint-plugin-prettier": "^5.0.1",
