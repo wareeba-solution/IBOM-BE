@@ -14,6 +14,7 @@
  *         - birthDate
  *         - birthTime
  *         - gender
+ *         - placeOfBirth
  *         - birthType
  *         - deliveryMethod
  *         - facilityId
@@ -91,6 +92,11 @@
  *           type: string
  *           enum: [male, female, other]
  *           description: Baby's gender
+ *         placeOfBirth:
+ *           type: string
+ *           enum: [HOSPITAL, HOME]
+ *           default: HOSPITAL
+ *           description: Location where the birth occurred
  *         apgarScoreOneMin:
  *           type: integer
  *           minimum: 0
@@ -166,6 +172,7 @@
  *         birthDate: "2024-05-29"
  *         birthTime: "14:30:00"
  *         gender: "female"
+ *         placeOfBirth: "HOSPITAL"
  *         birthWeight: 3.2
  *         birthType: "singleton"
  *         deliveryMethod: "vaginal"
@@ -187,6 +194,7 @@
  *         - birthDate
  *         - birthTime
  *         - gender
+ *         - placeOfBirth
  *         - birthType
  *         - deliveryMethod
  *         - facilityId
@@ -219,6 +227,10 @@
  *         gender:
  *           type: string
  *           enum: [male, female, other]
+ *         placeOfBirth:
+ *           type: string
+ *           enum: [HOSPITAL, HOME]
+ *           description: Location where the birth occurred
  *         birthType:
  *           type: string
  *           enum: [singleton, twin, triplet, quadruplet, other]
@@ -282,6 +294,15 @@
  *               type: integer
  *             triplet:
  *               type: integer
+ *         byPlaceOfBirth:
+ *           type: object
+ *           properties:
+ *             HOSPITAL:
+ *               type: integer
+ *               description: Number of hospital births
+ *             HOME:
+ *               type: integer
+ *               description: Number of home births
  *         averageBirthWeight:
  *           type: number
  *           description: Average birth weight in kilograms
@@ -346,6 +367,12 @@
  *           enum: [singleton, twin, triplet, quadruplet, other]
  *         description: Filter by birth type
  *       - in: query
+ *         name: placeOfBirth
+ *         schema:
+ *           type: string
+ *           enum: [HOSPITAL, HOME]
+ *         description: Filter by place of birth
+ *       - in: query
  *         name: lgaResidence
  *         schema:
  *           type: string
@@ -406,6 +433,7 @@
  *             birthDate: "2024-05-29"
  *             birthTime: "14:30:00"
  *             gender: "female"
+ *             placeOfBirth: "HOSPITAL"
  *             birthWeight: 3.2
  *             birthType: "singleton"
  *             deliveryMethod: "vaginal"
@@ -497,6 +525,12 @@
  *           type: string
  *           enum: [singleton, twin, triplet, quadruplet, other]
  *         description: Search by birth type
+ *       - in: query
+ *         name: placeOfBirth
+ *         schema:
+ *           type: string
+ *           enum: [HOSPITAL, HOME]
+ *         description: Search by place of birth
  *       - in: query
  *         name: lgaResidence
  *         schema:
@@ -666,6 +700,10 @@
  *                 type: integer
  *                 minimum: 0
  *                 maximum: 120
+ *               placeOfBirth:
+ *                 type: string
+ *                 enum: [HOSPITAL, HOME]
+ *                 description: Location where the birth occurred
  *               birthWeight:
  *                 type: number
  *                 minimum: 0
