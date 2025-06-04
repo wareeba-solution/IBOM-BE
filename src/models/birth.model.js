@@ -128,6 +128,11 @@ module.exports = (sequelize, DataTypes) => {
         type: DataTypes.ENUM('male', 'female', 'other'),
         allowNull: false,
       },
+      placeOfBirth: {
+        type: DataTypes.ENUM('HOSPITAL', 'HOME'),
+        allowNull: false,
+        defaultValue: 'HOSPITAL',
+      },
       apgarScoreOneMin: {
         type: DataTypes.INTEGER,
         allowNull: true,
