@@ -259,6 +259,87 @@
  *           minimum: 0
  *           maximum: 10
  *
+ *     FormFieldMetadata:
+ *       type: object
+ *       properties:
+ *         type:
+ *           type: string
+ *           enum: [text, number, date, time, select, uuid, boolean]
+ *           description: Type of the form field
+ *         required:
+ *           type: boolean
+ *           description: Whether the field is required
+ *         label:
+ *           type: string
+ *           description: Display label for the field
+ *         maxLength:
+ *           type: integer
+ *           description: Maximum length for text fields
+ *         min:
+ *           type: number
+ *           description: Minimum value for number fields
+ *         max:
+ *           type: number
+ *           description: Maximum value for number fields
+ *         step:
+ *           type: number
+ *           description: Step increment for number fields
+ *         options:
+ *           type: array
+ *           items:
+ *             type: object
+ *             properties:
+ *               value:
+ *                 type: string
+ *               label:
+ *                 type: string
+ *           description: Available options for select fields
+ *         default:
+ *           type: string
+ *           description: Default value for the field
+ *
+ *     FormConfiguration:
+ *       type: object
+ *       properties:
+ *         fields:
+ *           type: object
+ *           additionalProperties:
+ *             $ref: '#/components/schemas/FormFieldMetadata'
+ *           description: Form field definitions
+ *         version:
+ *           type: string
+ *           description: Version of the form configuration
+ *         lastUpdated:
+ *           type: string
+ *           format: date-time
+ *           description: When the configuration was last updated
+ *       example:
+ *         fields:
+ *           motherName:
+ *             type: "text"
+ *             required: true
+ *             maxLength: 100
+ *             label: "Mother Name"
+ *           motherAge:
+ *             type: "number"
+ *             required: true
+ *             min: 0
+ *             max: 120
+ *             label: "Mother Age"
+ *           gender:
+ *             type: "select"
+ *             required: true
+ *             options:
+ *               - value: "male"
+ *                 label: "Male"
+ *               - value: "female"
+ *                 label: "Female"
+ *               - value: "other"
+ *                 label: "Other"
+ *             label: "Gender"
+ *         version: "2.0"
+ *         lastUpdated: "2025-06-05T10:30:00Z"
+ *
  *     BirthStatistics:
  *       type: object
  *       properties:
@@ -406,6 +487,15 @@
  *                       type: integer
  *                     pageSize:
  *                       type: integer
+ *                     meta:
+ *                       type: object
+ *                       properties:
+ *                         formFields:
+ *                           type: object
+ *                           additionalProperties:
+ *                             $ref: '#/components/schemas/FormFieldMetadata'
+ *                         version:
+ *                           type: string
  *       401:
  *         description: Unauthorized - Invalid or expired token
  *       500:
@@ -455,13 +545,53 @@
  *                   type: string
  *                   example: Birth record created successfully
  *                 data:
- *                   $ref: '#/components/schemas/Birth'
+ *                   allOf:
+ *                     - $ref: '#/components/schemas/Birth'
+ *                     - type: object
+ *                       properties:
+ *                         meta:
+ *                           type: object
+ *                           properties:
+ *                             formFields:
+ *                               type: object
+ *                               additionalProperties:
+ *                                 $ref: '#/components/schemas/FormFieldMetadata'
+ *                             version:
+ *                               type: string
  *       400:
  *         description: Validation error
  *       401:
  *         description: Unauthorized
  *       404:
  *         description: Mother or facility not found
+ *       500:
+ *         description: Server error
+ *
+ * /births/form-config:
+ *   get:
+ *     summary: Get form configuration
+ *     description: Retrieve form field metadata for frontend auto-discovery and dynamic form generation
+ *     tags: [Births]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Form configuration retrieved successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 status:
+ *                   type: string
+ *                   example: success
+ *                 message:
+ *                   type: string
+ *                   example: Form configuration retrieved successfully
+ *                 data:
+ *                   $ref: '#/components/schemas/FormConfiguration'
+ *       401:
+ *         description: Unauthorized - Invalid or expired token
  *       500:
  *         description: Server error
  *
@@ -577,6 +707,15 @@
  *                       type: integer
  *                     pageSize:
  *                       type: integer
+ *                     meta:
+ *                       type: object
+ *                       properties:
+ *                         formFields:
+ *                           type: object
+ *                           additionalProperties:
+ *                             $ref: '#/components/schemas/FormFieldMetadata'
+ *                         version:
+ *                           type: string
  *       401:
  *         description: Unauthorized
  *       500:
