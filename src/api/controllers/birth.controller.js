@@ -1,11 +1,33 @@
 const BirthService = require('../services/birth.service');
 const ApiResponse = require('../../utils/apiResponse');
 const logger = require('../../utils/logger');
+const { getBirthFormMetadata } = require('../../utils/formMetadata'); // Add this import
 
 /**
  * Birth controller
  */
 class BirthController {
+  /**
+   * Get form configuration for frontend auto-discovery
+   * @param {Object} req - Request object
+   * @param {Object} res - Response object
+   * @returns {Object} Response
+   */
+  static async getFormConfig(req, res) {
+    try {
+      const formConfig = {
+        fields: getBirthFormMetadata(),
+        version: '2.0',
+        lastUpdated: new Date().toISOString()
+      };
+      
+      return ApiResponse.success(res, 'Form configuration retrieved successfully', formConfig);
+    } catch (error) {
+      logger.error('Get form config error:', error);
+      return ApiResponse.serverError(res, 'Failed to retrieve form configuration');
+    }
+  }
+
   /**
    * Get all birth records
    * @param {Object} req - Request object
@@ -21,16 +43,36 @@ class BirthController {
         startDate: req.query.startDate ? new Date(req.query.startDate) : null,
         endDate: req.query.endDate ? new Date(req.query.endDate) : null,
         gender: req.query.gender,
+        placeOfBirth: req.query.placeOfBirth, // Add this line
         deliveryMethod: req.query.deliveryMethod,
         birthType: req.query.birthType,
         lgaResidence: req.query.lgaResidence,
       };
 
       const result = await BirthService.getAllBirths(options);
-      return ApiResponse.success(res, 'Birth records retrieved successfully', result);
+      
+      // Add form metadata to response
+      const response = {
+        ...result,
+        meta: {
+          formFields: getBirthFormMetadata(),
+          version: '2.0'
+        }
+      };
+      
+      return ApiResponse.success(res, 'Birth records retrieved successfully', response);
     } catch (error) {
       logger.error('Get all births error:', error);
-      return ApiResponse.serverError(res, error.message);
+      
+      // Include form metadata in error response
+      const errorResponse = {
+        meta: {
+          formFields: getBirthFormMetadata(),
+          version: '2.0'
+        }
+      };
+      
+      return ApiResponse.serverError(res, error.message, errorResponse);
     }
   }
 
@@ -66,15 +108,33 @@ class BirthController {
   static async createBirth(req, res) {
     try {
       const birth = await BirthService.createBirth(req.body, req.user.id);
-      return ApiResponse.created(res, 'Birth record created successfully', birth);
+      
+      // Add form metadata to successful response
+      const response = {
+        ...birth,
+        meta: {
+          formFields: getBirthFormMetadata(),
+          version: '2.0'
+        }
+      };
+      
+      return ApiResponse.created(res, 'Birth record created successfully', response);
     } catch (error) {
       logger.error('Create birth error:', error);
+      
+      // Include form metadata in error responses
+      const errorMeta = {
+        meta: {
+          formFields: getBirthFormMetadata(),
+          version: '2.0'
+        }
+      };
       
       if (error.message === 'Mother not found') {
         return ApiResponse.error(
           res,
           error.message,
-          { motherId: 'Mother not found' },
+          { motherId: 'Mother not found', ...errorMeta },
           404
         );
       }
@@ -83,12 +143,12 @@ class BirthController {
         return ApiResponse.error(
           res,
           error.message,
-          { facilityId: 'Facility not found' },
+          { facilityId: 'Facility not found', ...errorMeta },
           404
         );
       }
       
-      return ApiResponse.serverError(res, error.message);
+      return ApiResponse.serverError(res, error.message, errorMeta);
     }
   }
 
@@ -152,6 +212,7 @@ class BirthController {
         startDate: req.query.startDate ? new Date(req.query.startDate) : null,
         endDate: req.query.endDate ? new Date(req.query.endDate) : null,
         gender: req.query.gender,
+        placeOfBirth: req.query.placeOfBirth, // Add this line
         deliveryMethod: req.query.deliveryMethod,
         birthType: req.query.birthType,
         lgaResidence: req.query.lgaResidence,
@@ -161,16 +222,25 @@ class BirthController {
   
       const result = await BirthService.searchBirths(searchParams);
       
+      // Add form metadata to response
+      const response = {
+        ...result,
+        meta: {
+          formFields: getBirthFormMetadata(),
+          version: '2.0'
+        }
+      };
+      
       // If no results were found, provide a friendly message
       if (result.totalItems === 0) {
         return ApiResponse.success(
           res, 
           'No birth records match your search criteria. Try adjusting your filters or creating new records.',
-          result
+          response
         );
       }
       
-      return ApiResponse.success(res, 'Search results retrieved successfully', result);
+      return ApiResponse.success(res, 'Search results retrieved successfully', response);
     } catch (error) {
       logger.error('Search births error:', error);
       return ApiResponse.serverError(res, error.message);

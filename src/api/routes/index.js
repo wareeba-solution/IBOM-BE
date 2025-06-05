@@ -1,4 +1,4 @@
-// api/routes/index.js (Updated)
+// api/routes/index.js (CORRECTED)
 const express = require('express');
 const router = express.Router();
 
@@ -11,22 +11,24 @@ const {
   healthLimiter
 } = require('../../middleware/rateLimiter');
 
-// Import route modules
-const authRoutes = require('./auth.routes');
-const userRoutes = require('./user.routes');
-const facilityRoutes = require('./facility.routes');
-const patientRoutes = require('./patient.routes');
-const birthRoutes = require('./birth.routes');
-const deathStatisticRoutes = require('./death.routes');
-const immunizationRoutes = require('./immunization.routes');
-const diseaseRoutes = require('./disease.routes');
-const familyPlanningRoutes = require('./familyPlanning.routes');
-const dataImportRoutes = require('./dataImport.routes');
+// Import route modules (matching your actual files)
+const adminRoutes = require('./admin.routes');
 const antenatalRoutes = require('./antenatal.routes');
+const authRoutes = require('./auth.routes');
+const birthRoutes = require('./birth.routes');
+const dashboardRoutes = require('./dashboard.routes');
+const dataImportRoutes = require('./dataImport.routes');
+const deathRoutes = require('./death.routes');
+const diseaseRoutes = require('./disease.routes');
+const facilityRoutes = require('./facility.routes');
+const familyPlanningRoutes = require('./familyPlanning.routes');
+const immunizationRoutes = require('./immunization.routes');
+const integrationRoutes = require('./integration.routes');
+const mobileRoutes = require('./mobile.routes');
+const patientRoutes = require('./patient.routes');
 const reportRoutes = require('./report.routes');
-
-
-// ✅ NEW: Import utility routes
+const supportRoutes = require('./support.routes');
+const userRoutes = require('./user.routes');
 const utilityRoutes = require('./utility.routes');
 
 // API root endpoint
@@ -38,30 +40,36 @@ router.get('/', (req, res) => {
   });
 });
 
-// ✅ Apply specific rate limiters to individual route groups
+// ✅ Apply rate limiters correctly (only ONE per route group)
 
 // Authentication routes with strict rate limiting
 router.use('/auth', authLimiter, authRoutes);
 
-// Patient routes with enhanced monitoring (for infinite loop detection)
+// Patient routes with enhanced monitoring
 router.use('/patients', enhancedPatientLimiter, patientRoutes);
 
-// Data import routes (write-heavy operations) - stricter limits
+// Data import routes (write-heavy operations)
 router.use('/data-import', writeLimiter, dataImportRoutes);
 
-// ✅ NEW: Utility routes (Nigerian states/LGAs) - read-only, so lighter limits
+// Utility routes (read-only)
 router.use('/utility', readOnlyLimiter, utilityRoutes);
 
-// All other routes with balanced read/write limits
-router.use('/users', readOnlyLimiter, writeLimiter, userRoutes);
-router.use('/facilities', readOnlyLimiter, writeLimiter, facilityRoutes);
-router.use('/births', readOnlyLimiter, writeLimiter, birthRoutes);
-router.use('/death-statistics', readOnlyLimiter, writeLimiter, deathStatisticRoutes);
-router.use('/immunizations', readOnlyLimiter, writeLimiter, immunizationRoutes);
-router.use('/diseases', readOnlyLimiter, writeLimiter, diseaseRoutes);
-router.use('/family-planning', readOnlyLimiter, writeLimiter, familyPlanningRoutes);
-router.use('/antenatal', readOnlyLimiter, writeLimiter, antenatalRoutes);
-router.use('/reports', readOnlyLimiter, writeLimiter, reportRoutes);
+// 🔧 FIXED: Birth routes with ONLY readOnlyLimiter
+router.use('/births', readOnlyLimiter, birthRoutes);
 
+// All other routes with appropriate limiters
+router.use('/admin', readOnlyLimiter, adminRoutes);
+router.use('/antenatal', readOnlyLimiter, antenatalRoutes);
+router.use('/dashboard', readOnlyLimiter, dashboardRoutes);
+router.use('/death-statistics', readOnlyLimiter, deathRoutes);
+router.use('/diseases', readOnlyLimiter, diseaseRoutes);
+router.use('/facilities', readOnlyLimiter, facilityRoutes);
+router.use('/family-planning', readOnlyLimiter, familyPlanningRoutes);
+router.use('/immunizations', readOnlyLimiter, immunizationRoutes);
+router.use('/integration', readOnlyLimiter, integrationRoutes);
+router.use('/mobile', readOnlyLimiter, mobileRoutes);
+router.use('/reports', readOnlyLimiter, reportRoutes);
+router.use('/support', readOnlyLimiter, supportRoutes);
+router.use('/users', readOnlyLimiter, userRoutes);
 
 module.exports = router;

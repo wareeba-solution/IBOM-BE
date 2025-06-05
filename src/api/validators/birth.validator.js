@@ -54,6 +54,9 @@ const createBirthSchema = yup.object().shape({
   gender: yup.string()
     .required('Gender is required')
     .oneOf(['male', 'female', 'other'], 'Invalid gender'),
+  placeOfBirth: yup.string()
+    .required('Place of birth is required')
+    .oneOf(['HOSPITAL', 'HOME'], 'Place of birth must be either HOSPITAL or HOME'),
   apgarScoreOneMin: yup.number()
     .min(0, 'APGAR score at 1 minute must be at least 0')
     .max(10, 'APGAR score at 1 minute must be at most 10')
@@ -141,6 +144,8 @@ const updateBirthSchema = yup.object().shape({
     .matches(/^([01]\d|2[0-3]):([0-5]\d)(:([0-5]\d))?$/, 'Birth time must be in HH:MM or HH:MM:SS format'),
   gender: yup.string()
     .oneOf(['male', 'female', 'other'], 'Invalid gender'),
+  placeOfBirth: yup.string()
+    .oneOf(['HOSPITAL', 'HOME'], 'Place of birth must be either HOSPITAL or HOME'),
   apgarScoreOneMin: yup.number()
     .min(0, 'APGAR score at 1 minute must be at least 0')
     .max(10, 'APGAR score at 1 minute must be at most 10')
@@ -187,11 +192,13 @@ const searchBirthSchema = yup.object().shape({
   startDate: yup.date(),
   endDate: yup.date(),
   gender: yup.string()
-    .oneOf(['male', 'female', 'other'], 'Invalid gender'),
+    .oneOf(['male', 'female'], 'Invalid gender'),
+  placeOfBirth: yup.string()
+    .oneOf(['HOSPITAL', 'HOME'], 'Place of birth must be either HOSPITAL or HOME'),
   deliveryMethod: yup.string()
-    .oneOf(['vaginal', 'cesarean', 'assisted', 'other'], 'Invalid delivery method'),
+    .oneOf(['vaginal', 'cesarean', 'assisted'], 'Invalid delivery method'),
   birthType: yup.string()
-    .oneOf(['singleton', 'twin', 'triplet', 'quadruplet', 'other'], 'Invalid birth type'),
+    .oneOf(['singleton', 'twin', 'triplet', 'quadruplet'], 'Invalid birth type'),
   lgaResidence: yup.string()
     .oneOf([...config.constants.AKWA_IBOM_LGAS, 'Other'], 'Invalid LGA of Residence'),
 });

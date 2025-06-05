@@ -1,4 +1,4 @@
-// index.js
+// src/config/index.js
 const dotenv = require('dotenv');
 
 // Load environment variables from .env file

@@ -11,13 +11,16 @@ router.use(verifyToken);
 // Get all birth records
 router.get('/', BirthController.getAllBirths);
 
+// 🔧 ADD: Form configuration endpoint (must come before /:id route)
+router.get('/form-config', BirthController.getFormConfig);
+
 // Search birth records
 router.get('/search', BirthController.searchBirths);
 
 // Get birth statistics
 router.get('/statistics', BirthController.getBirthStatistics);
 
-// Get birth record by ID
+// Get birth record by ID (this must come AFTER specific routes like /form-config)
 router.get('/:id', BirthController.getBirthById);
 
 // Create a new birth record
