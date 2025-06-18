@@ -24,11 +24,14 @@ router.get('/statistics', BirthController.getBirthStatistics);
 router.get('/:id', BirthController.getBirthById);
 
 // Create a new birth record
-router.post(
-  '/',
-  [validateRequestBody(createBirthSchema)],
-  BirthController.createBirth
-);
+// router.post(
+//   '/',
+//   [validateRequestBody(createBirthSchema)],
+//   BirthController.createBirth
+// );
+
+router.post('/', BirthController.createBirth); // Remove validation middleware
+
 
 // Update birth record
 router.put(
